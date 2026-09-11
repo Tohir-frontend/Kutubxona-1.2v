@@ -372,10 +372,9 @@ HTML = """
   .auth-link a { color: #1a3a6e; }
   .bolim-sarlavha { color: white; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 10px; margin: 20px 0 10px; }
   .kitoblar { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
-  .karta { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: transform 0.2s; }
-  .karta:hover { transform: translateY(-5px); }
-  .muqova { position: relative; width: 100%; height: 280px; background: linear-gradient(135deg, #1a3a6e, #2c5aa0); display: flex; align-items: center; justify-content: center; color: white; font-size: 48px; font-weight: bold; overflow: hidden }
-  .muqova img { width: 100%; height: 100%; object-fit: contain }
+  .karta { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+  .muqora { position: relative; width: 100%; height: 196px; background: linear-gradient(135deg, #1a3a6e, #2c5aa0); display: flex; align-items: center; justify-content: center; color: white; font-size: 48px; font-weight: bold; overflow: hidden }
+  .muqora img { width: 100%; height: 100%; object-fit: contain }
   .muqora-link { display: block; width: 100%; height: 100%; text-decoration: none; transition: opacity 0.2s; }
   .muqora-link:hover img { opacity: 0.85 }
   .yulduzcha { position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; font-size: 20px; text-decoration: none; color: #fff; line-height: 1; transition: transform 0.15s, background 0.15s; }
@@ -438,7 +437,7 @@ HTML = """
     .bolim-sarlavha { padding: 10px; margin: 14px 0 8px; }
     .bolim-sarlavha h2 { font-size: 17px; }
     .kitoblar { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
-    .muqova { height: 180px; font-size: 34px; }
+    .muqora { height: 126px; font-size: 28px; }
     .yulduzcha { width: 28px; height: 28px; font-size: 16px; }
     .karta-tana { padding: 10px; }
     .karta-tana h3 { font-size: 14px; }
@@ -457,7 +456,7 @@ HTML = """
 
   @media (max-width: 420px) {
     .kitoblar { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
-    .muqova { height: 140px; font-size: 26px; }
+    .muqova { height: 98px; font-size: 26px; }
     #search-status { display: none; }
   }
 </style>
@@ -597,23 +596,23 @@ HTML = """
         <div class="karta-tana">
           <small style="color:#1a3a6e">{{ item.bolim }}</small>
           <h3>{{ item.kitob.nomi }}</h3>
-          <p>{{ item.kitob.muallif }} ({{ item.kitob.yili }})</p>
-          <div class="tugmalar">
-            {% if item.kitob.telegram_havola %}
-              <a class="btn btn-ochish" href="{{ item.kitob.telegram_havola }}" target="_blank" rel="noopener">O'qish</a>
-              <a class="btn btn-yuklash" href="{{ item.kitob.telegram_havola }}" target="_blank" rel="noopener">Telegramdan yuklash</a>
-            {% elif item.kitob.google_drive_havola %}
-              <a class="btn btn-ochish" href="{{ google_drive_preview_url(item.kitob.google_drive_havola) }}" target="_blank" rel="noopener">Ko'rish</a>
-              <a class="btn btn-yuklash" href="{{ google_drive_yuklab_url(item.kitob.google_drive_havola) }}" target="_blank" rel="noopener">Yuklab olish</a>
-            {% elif item.kitob.fayl %}
-              <a class="btn btn-ochish" href="{{ url_for('ochish', bolim=item.bolim, idx=item.idx) }}">O'qish</a>
-              <a class="btn btn-yuklash" href="{{ url_for('static', filename='files/' + item.kitob.fayl) }}" download>Yuklab</a>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
+           <p>{{ item.kitob.muallif }} ({{ item.kitob.yili }})</p>
+           <div class="tugmalar">
+             {% if item.kitob.telegram_havola %}
+               <a class="btn btn-ochish" href="{{ item.kitob.telegram_havola }}" target="_blank" rel="noopener">O'qish</a>
+               <a class="btn btn-yuklash" href="{{ item.kitob.telegram_havola }}" target="_blank" rel="noopener">Telegramdan yuklash</a>
+             {% elif item.kitob.google_drive_havola %}
+               <a class="btn btn-ochish" href="{{ google_drive_preview_url(item.kitob.google_drive_havola) }}" target="_blank" rel="noopener">Ko'rish</a>
+               <a class="btn btn-yuklash" href="{{ google_drive_yuklab_url(item.kitob.google_drive_havola) }}" target="_blank" rel="noopener">Yuklab olish</a>
+             {% elif item.kitob.fayl %}
+               <a class="btn btn-ochish" href="{{ url_for('ochish', bolim=item.bolim, idx=item.idx) }}">O'qish</a>
+               <a class="btn btn-yuklash" href="{{ url_for('static', filename='files/' + item.kitob.fayl) }}" download>Yuklab</a>
+             {% endif %}
+           </div>
+         </div>
+       </div>
+       {% endfor %}
+     </div>
     {% elif so_rov %}
     <p style="color:white; text-align:center; margin-top:20px">Hech narsa topilmadi.</p>
     {% endif %}
