@@ -1,6 +1,15 @@
 {
   "Umumta'lim fanlar": [
     {
+      "nomi": "11-sinf Fizika",
+      "muallif": "N.Sh.Turdiyev",
+      "yili": "2018",
+      "muqova": "10-s_f.jpg",
+      "telegram_havola": "https://t.me/c/2516385499/36",
+      "tomonidan": "erjanovtohir1993@gmail.com",
+      "id": "c54e3838613942efac388da74160389f"
+    },
+    {
       "nomi": "10-sinf Fizika",
       "muallif": "N.Sh.Turdiyev",
       "yili": "2018",
@@ -11,6 +20,16 @@
     }
   ],
   "Umumkasbiy fanlar": [],
-  "Maxsus fanlar": [],
+  "Maxsus fanlar": [
+    {
+      "nomi": "Maktabgacha yoshdagi bolalar ta'lim-tarbiyasida bilish jarayonining rivojlanishi",
+      "muallif": "M.Abdurahmonova",
+      "yili": "2026",
+      "muqova": "",
+      "telegram_havola": "https://t.me/c/2516385499/38",
+      "tomonidan": "erjanovtohir1993@gmail.com",
+      "id": "8dd8aa79420f4cedada5eadd96623f49"
+    }
+  ],
   "Badiiy adabiyotlar": []
 }

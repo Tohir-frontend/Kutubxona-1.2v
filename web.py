@@ -523,11 +523,11 @@ HTML = """
              {% set oqish_url = kitob_oqish_havolasi(kitob, bolim, loop.index0) %}
              {% set tg_bosiq = kitob.telegram_havola %}
              {% if kitob.muqova %}
-               {% if oqish_url %}<a href="{{ oqish_url }}"{{ ' target="_blank" rel="noopener"' if tg_bosiq else '' }} class="muqora-link">{% endif %}
+               {% if oqish_url %}<a href="{{ oqish_url }}"{% if tg_bosiq %} target="_blank" rel="noopener"{% endif %} class="muqora-link">{% endif %}
                <img src="{{ url_for('static', filename='covers/' + kitob.muqova) }}" alt="{{ kitob.nomi }}" style="cursor:{{ 'pointer' if oqish_url else 'default' }}">
                {% if oqish_url %}</a>{% endif %}
              {% else %}
-               {% if oqish_url %}<a href="{{ oqish_url }}"{{ ' target="_blank" rel="noopener"' if tg_bosiq else '' }} class="muqora-link">{% endif %}
+               {% if oqish_url %}<a href="{{ oqish_url }}"{% if tg_bosiq %} target="_blank" rel="noopener"{% endif %} class="muqora-link">{% endif %}
                <span style="cursor:{{ 'pointer' if oqish_url else 'default' }}">{{ kitob.nomi[0]|upper }}</span>
                {% if oqish_url %}</a>{% endif %}
              {% endif %}
@@ -579,11 +579,11 @@ HTML = """
           {% set oqish_url = kitob_oqish_havolasi(item.kitob, item.bolim, item.idx) %}
           {% set tg_bosiq = item.kitob.telegram_havola %}
           {% if item.kitob.muqova %}
-            {% if oqish_url %}<a href="{{ oqish_url }}"{{ ' target="_blank" rel="noopener"' if tg_bosiq else '' }} class="muqora-link">{% endif %}
+            {% if oqish_url %}<a href="{{ oqish_url }}"{% if tg_bosiq %} target="_blank" rel="noopener"{% endif %} class="muqora-link">{% endif %}
             <img src="{{ url_for('static', filename='covers/' + item.kitob.muqova) }}" alt="{{ item.kitob.nomi }}" style="cursor:{{ 'pointer' if oqish_url else 'default' }}">
             {% if oqish_url %}</a>{% endif %}
           {% else %}
-            {% if oqish_url %}<a href="{{ oqish_url }}"{{ ' target="_blank" rel="noopener"' if tg_bosiq else '' }} class="muqora-link">{% endif %}
+            {% if oqish_url %}<a href="{{ oqish_url }}"{% if tg_bosiq %} target="_blank" rel="noopener"{% endif %} class="muqora-link">{% endif %}
             <span style="cursor:{{ 'pointer' if oqish_url else 'default' }}">{{ item.kitob.nomi[0]|upper }}</span>
             {% if oqish_url %}</a>{% endif %}
           {% endif %}
@@ -629,11 +629,11 @@ HTML = """
           {% set oqish_url = kitob_oqish_havolasi(item.kitob, item.bolim, item.idx) %}
           {% set tg_bosiq = item.kitob.telegram_havola %}
           {% if item.kitob.muqova %}
-            {% if oqish_url %}<a href="{{ oqish_url }}"{{ ' target="_blank" rel="noopener"' if tg_bosiq else '' }} class="muqora-link">{% endif %}
+            {% if oqish_url %}<a href="{{ oqish_url }}"{% if tg_bosiq %} target="_blank" rel="noopener"{% endif %} class="muqora-link">{% endif %}
             <img src="{{ url_for('static', filename='covers/' + item.kitob.muqova) }}" alt="{{ item.kitob.nomi }}" style="cursor:{{ 'pointer' if oqish_url else 'default' }}">
             {% if oqish_url %}</a>{% endif %}
           {% else %}
-            {% if oqish_url %}<a href="{{ oqish_url }}"{{ ' target="_blank" rel="noopener"' if tg_bosiq else '' }} class="muqora-link">{% endif %}
+            {% if oqish_url %}<a href="{{ oqish_url }}"{% if tg_bosiq %} target="_blank" rel="noopener"{% endif %} class="muqora-link">{% endif %}
             <span style="cursor:{{ 'pointer' if oqish_url else 'default' }}">{{ item.kitob.nomi[0]|upper }}</span>
             {% if oqish_url %}</a>{% endif %}
           {% endif %}
