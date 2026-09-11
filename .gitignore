@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.DS_Store
+.env
+users.json
+tasdiqlash_kodlari.txt
