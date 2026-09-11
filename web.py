@@ -271,6 +271,69 @@ def telegram_havolasi_mi(havola):
   } and bool(parsed.path.strip("/"))
 
 
+def google_drive_id_ajratish(havola):
+  """Google Drive havolasidan fayl ID sini ajratib oladi.
+  Qo'llab-quvvatlanadigan formatlar:
+    - https://drive.google.com/file/d/FILE_ID/view...
+    - https://docs.google.com/file/d/FILE_ID/...
+    - https://drive.google.com/open?id=FILE_ID
+    - https://drive.google.com/uc?id=FILE_ID
+  """
+  try:
+    parsed = urlparse((havola or "").strip())
+  except ValueError:
+    return None
+  host = parsed.netloc.lower().removeprefix("www.")
+  if host not in {"drive.google.com", "docs.google.com"}:
+    return None
+  path_parts = parsed.path.strip("/").split("/")
+  if len(path_parts) >= 3 and path_parts[0] == "file" and path_parts[1] == "d":
+    return path_parts[2]
+  if "id=" in parsed.query:
+    from urllib.parse import parse_qs
+    ids = parse_qs(parsed.query).get("id", [])
+    if ids:
+      return ids[0]
+  return None
+
+
+def google_drive_havolasi_mi(havola):
+  """Google Drive havolasini tekshiradi. True/False qaytaradi."""
+  return google_drive_id_ajratish(havola) is not None
+
+
+def google_drive_preview_url(havola):
+  """Google Drive havolasidan embed preview URL yaratadi."""
+  kid = google_drive_id_ajratish(havola)
+  if kid:
+    return f"https://drive.google.com/file/d/{kid}/preview"
+  return havola or ""
+
+
+def google_drive_yuklab_url(havola):
+  """Google Drive havolasidan to'g'ridan-yuklab olish URL yaratadi."""
+  kid = google_drive_id_ajratish(havola)
+  if kid:
+    return f"https://drive.google.com/uc?export=download&id={kid}"
+  return havola or ""
+
+
+app.jinja_env.globals["google_drive_preview_url"] = google_drive_preview_url
+app.jinja_env.globals["google_drive_yuklab_url"] = google_drive_yuklab_url
+
+
+def kitob_oqish_havolasi(kitob, bolim, idx):
+  """Kitob uchun o'qish havolasini qaytaradi, o'qish bo'lmasa None."""
+  if kitob.get("telegram_havola"):
+    return kitob["telegram_havola"]
+  if kitob.get("google_drive_havola") or kitob.get("fayl"):
+    return url_for("ochish", bolim=bolim, idx=idx)
+  return None
+
+
+app.jinja_env.globals["kitob_oqish_havolasi"] = kitob_oqish_havolasi
+
+
 HTML = """
 <!DOCTYPE html>
 <html lang="uz">
@@ -313,6 +376,8 @@ HTML = """
   .karta:hover { transform: translateY(-5px); }
   .muqova { position: relative; width: 100%; height: 280px; background: linear-gradient(135deg, #1a3a6e, #2c5aa0); display: flex; align-items: center; justify-content: center; color: white; font-size: 48px; font-weight: bold; overflow: hidden }
   .muqova img { width: 100%; height: 100%; object-fit: contain }
+  .muqora-link { display: block; width: 100%; height: 100%; text-decoration: none; transition: opacity 0.2s; }
+  .muqora-link:hover img { opacity: 0.85 }
   .yulduzcha { position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; font-size: 20px; text-decoration: none; color: #fff; line-height: 1; transition: transform 0.15s, background 0.15s; }
   .yulduzcha:hover { transform: scale(1.15); background: rgba(0,0,0,0.65); }
   .yulduzcha.faol { color: #ffc107; }
@@ -340,6 +405,23 @@ HTML = """
   .btn-qaytish:active { transform: translateY(0) scale(0.98); }
   .btn-qaytish .btn-qaytish-ok { font-size: 18px; }
   .btn-qaytish .btn-qaytish-esc { background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.6); border-radius: 6px; padding: 2px 8px; font-size: 12px; letter-spacing: 0.5px; }
+
+  .btn-chiqish-pastki, .btn-yuklab-ochish {
+    display: inline-flex; align-items: center; gap: 8px;
+    border: none; border-radius: 12px;
+    font-size: 14px; font-weight: bold;
+    padding: 10px 20px;
+    cursor: pointer;
+    text-decoration: none;
+    color: #fff;
+    transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+  }
+  .btn-chiqish-pastki { background: linear-gradient(135deg, #e63950, #b8283d); box-shadow: 0 3px 10px rgba(184,40,61,0.5); }
+  .btn-chiqish-pastki:hover { background: linear-gradient(135deg, #ff4d64, #d32f45); transform: translateY(-2px) scale(1.05); box-shadow: 0 5px 16px rgba(184,40,61,0.7); }
+  .btn-chiqish-pastki:active { transform: translateY(0) scale(0.96); box-shadow: 0 2px 6px rgba(184,40,61,0.5); }
+  .btn-yuklab-ochish { background: linear-gradient(135deg, #28a745, #1e7e34); box-shadow: 0 3px 10px rgba(40,167,69,0.5); }
+  .btn-yuklab-ochish:hover { background: linear-gradient(135deg, #32ff7e, #28a745); transform: translateY(-2px) scale(1.05); box-shadow: 0 5px 16px rgba(40,167,69,0.7); }
+  .btn-yuklab-ochish:active { transform: translateY(0) scale(0.96); box-shadow: 0 2px 6px rgba(40,167,69,0.5); }
 
   .karusel { background: rgba(255,255,255,0.05); border-radius: 12px; overflow: hidden; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
   .karusel-track { display: flex; transition: transform 2s ease-in-out; }
@@ -436,28 +518,37 @@ HTML = """
       {% if malumot[bolim] %}
       <div class="kitoblar">
         {% for kitob in malumot[bolim] %}
-        <div class="karta">
-          <div class="muqova">
-            {% if kitob.muqova %}
-              <img src="{{ url_for('static', filename='covers/' + kitob.muqova) }}" alt="">
-            {% else %}
-              {{ kitob.nomi[0]|upper }}
-            {% endif %}
-            {% if foydalanuvchi %}
-              <a class="yulduzcha {{ 'faol' if kitob.id in sevimlilar else '' }}" href="#"
-                 data-url="{{ url_for('sevimli_belgilash', bolim=bolim, idx=loop.index0) }}"
-                 onclick="return sevimliBosildi(this, event)"
-                 title="Sevimlilarga qo'shish/olib tashlash">{{ '★' if kitob.id in sevimlilar else '☆' }}</a>
-            {% endif %}
-          </div>
+         <div class="karta">
+           <div class="muqora">
+             {% set oqish_url = kitob_oqish_havolasi(kitob, bolim, loop.index0) %}
+             {% set tg_bosiq = kitob.telegram_havola %}
+             {% if kitob.muqova %}
+               {% if oqish_url %}<a href="{{ oqish_url }}"{{ ' target="_blank" rel="noopener"' if tg_bosiq else '' }} class="muqora-link">{% endif %}
+               <img src="{{ url_for('static', filename='covers/' + kitob.muqova) }}" alt="{{ kitob.nomi }}" style="cursor:{{ 'pointer' if oqish_url else 'default' }}">
+               {% if oqish_url %}</a>{% endif %}
+             {% else %}
+               {% if oqish_url %}<a href="{{ oqish_url }}"{{ ' target="_blank" rel="noopener"' if tg_bosiq else '' }} class="muqora-link">{% endif %}
+               <span style="cursor:{{ 'pointer' if oqish_url else 'default' }}">{{ kitob.nomi[0]|upper }}</span>
+               {% if oqish_url %}</a>{% endif %}
+             {% endif %}
+             {% if foydalanuvchi %}
+               <a class="yulduzcha {{ 'faol' if kitob.id in sevimlilar else '' }}" href="#"
+                  data-url="{{ url_for('sevimli_belgilash', bolim=bolim, idx=loop.index0) }}"
+                  onclick="return sevimliBosildi(this, event)"
+                  title="Sevimlilarga qo'shish/olib tashlash">{{ '★' if kitob.id in sevimlilar else '☆' }}</a>
+             {% endif %}
+           </div>
           <div class="karta-tana">
             <h3>{{ kitob.nomi }}</h3>
             <p class="qator"><span>{{ kitob.muallif }}</span><span>{{ kitob.yili }}</span></p>
-            <p class="qator yuklagan"><span>{% if kitob.telegram_havola %}Telegram kanal{% elif kitob.fayl %}MB: {{ fayl_hajmi(kitob.fayl) }}{% endif %}</span><span>{{ foydalanuvchi_ismi(kitob.tomonidan) }}</span></p>
+            <p class="qator yuklagan"><span>{% if kitob.telegram_havola %}Telegram kanal{% elif kitob.google_drive_havola %}Google Drive{% elif kitob.fayl %}MB: {{ fayl_hajmi(kitob.fayl) }}{% endif %}</span><span>{{ foydalanuvchi_ismi(kitob.tomonidan) }}</span></p>
             <div class="tugmalar">
               {% if kitob.telegram_havola %}
                 <a class="btn btn-ochish" href="{{ kitob.telegram_havola }}" target="_blank" rel="noopener">O'qish</a>
                 <a class="btn btn-yuklash" href="{{ kitob.telegram_havola }}" target="_blank" rel="noopener">Telegramdan yuklash</a>
+              {% elif kitob.google_drive_havola %}
+                <a class="btn btn-ochish" href="{{ google_drive_preview_url(kitob.google_drive_havola) }}" target="_blank" rel="noopener">Ko'rish</a>
+                <a class="btn btn-yuklash" href="{{ google_drive_yuklab_url(kitob.google_drive_havola) }}" target="_blank" rel="noopener">Yuklab olish</a>
               {% elif kitob.fayl %}
                 <a class="btn btn-ochish" href="{{ url_for('ochish', bolim=bolim, idx=loop.index0) }}">O'qish</a>
                 <a class="btn btn-yuklash" href="{{ url_for('static', filename='files/' + kitob.fayl) }}" download>Yuklab</a>
@@ -484,11 +575,17 @@ HTML = """
     <div class="kitoblar" style="margin-top:20px">
       {% for item in natija %}
       <div class="karta">
-        <div class="muqova">
+        <div class="muqora">
+          {% set oqish_url = kitob_oqish_havolasi(item.kitob, item.bolim, item.idx) %}
+          {% set tg_bosiq = item.kitob.telegram_havola %}
           {% if item.kitob.muqova %}
-            <img src="{{ url_for('static', filename='covers/' + item.kitob.muqova) }}" alt="">
+            {% if oqish_url %}<a href="{{ oqish_url }}"{{ ' target="_blank" rel="noopener"' if tg_bosiq else '' }} class="muqora-link">{% endif %}
+            <img src="{{ url_for('static', filename='covers/' + item.kitob.muqova) }}" alt="{{ item.kitob.nomi }}" style="cursor:{{ 'pointer' if oqish_url else 'default' }}">
+            {% if oqish_url %}</a>{% endif %}
           {% else %}
-            {{ item.kitob.nomi[0]|upper }}
+            {% if oqish_url %}<a href="{{ oqish_url }}"{{ ' target="_blank" rel="noopener"' if tg_bosiq else '' }} class="muqora-link">{% endif %}
+            <span style="cursor:{{ 'pointer' if oqish_url else 'default' }}">{{ item.kitob.nomi[0]|upper }}</span>
+            {% if oqish_url %}</a>{% endif %}
           {% endif %}
           {% if foydalanuvchi %}
             <a class="yulduzcha {{ 'faol' if item.kitob.id in sevimlilar else '' }}" href="#"
@@ -505,6 +602,9 @@ HTML = """
             {% if item.kitob.telegram_havola %}
               <a class="btn btn-ochish" href="{{ item.kitob.telegram_havola }}" target="_blank" rel="noopener">O'qish</a>
               <a class="btn btn-yuklash" href="{{ item.kitob.telegram_havola }}" target="_blank" rel="noopener">Telegramdan yuklash</a>
+            {% elif item.kitob.google_drive_havola %}
+              <a class="btn btn-ochish" href="{{ google_drive_preview_url(item.kitob.google_drive_havola) }}" target="_blank" rel="noopener">Ko'rish</a>
+              <a class="btn btn-yuklash" href="{{ google_drive_yuklab_url(item.kitob.google_drive_havola) }}" target="_blank" rel="noopener">Yuklab olish</a>
             {% elif item.kitob.fayl %}
               <a class="btn btn-ochish" href="{{ url_for('ochish', bolim=item.bolim, idx=item.idx) }}">O'qish</a>
               <a class="btn btn-yuklash" href="{{ url_for('static', filename='files/' + item.kitob.fayl) }}" download>Yuklab</a>
@@ -525,11 +625,17 @@ HTML = """
     <div class="kitoblar" style="margin-top:20px">
       {% for item in natija %}
       <div class="karta" data-olib-tashlansin="1">
-        <div class="muqova">
+        <div class="muqora">
+          {% set oqish_url = kitob_oqish_havolasi(item.kitob, item.bolim, item.idx) %}
+          {% set tg_bosiq = item.kitob.telegram_havola %}
           {% if item.kitob.muqova %}
-            <img src="{{ url_for('static', filename='covers/' + item.kitob.muqova) }}" alt="">
+            {% if oqish_url %}<a href="{{ oqish_url }}"{{ ' target="_blank" rel="noopener"' if tg_bosiq else '' }} class="muqora-link">{% endif %}
+            <img src="{{ url_for('static', filename='covers/' + item.kitob.muqova) }}" alt="{{ item.kitob.nomi }}" style="cursor:{{ 'pointer' if oqish_url else 'default' }}">
+            {% if oqish_url %}</a>{% endif %}
           {% else %}
-            {{ item.kitob.nomi[0]|upper }}
+            {% if oqish_url %}<a href="{{ oqish_url }}"{{ ' target="_blank" rel="noopener"' if tg_bosiq else '' }} class="muqora-link">{% endif %}
+            <span style="cursor:{{ 'pointer' if oqish_url else 'default' }}">{{ item.kitob.nomi[0]|upper }}</span>
+            {% if oqish_url %}</a>{% endif %}
           {% endif %}
           <a class="yulduzcha faol" href="#"
              data-url="{{ url_for('sevimli_belgilash', bolim=item.bolim, idx=item.idx) }}"
@@ -544,6 +650,9 @@ HTML = """
             {% if item.kitob.telegram_havola %}
               <a class="btn btn-ochish" href="{{ item.kitob.telegram_havola }}" target="_blank" rel="noopener">O'qish</a>
               <a class="btn btn-yuklash" href="{{ item.kitob.telegram_havola }}" target="_blank" rel="noopener">Telegramdan yuklash</a>
+            {% elif item.kitob.google_drive_havola %}
+              <a class="btn btn-ochish" href="{{ google_drive_preview_url(item.kitob.google_drive_havola) }}" target="_blank" rel="noopener">Ko'rish</a>
+              <a class="btn btn-yuklash" href="{{ google_drive_yuklab_url(item.kitob.google_drive_havola) }}" target="_blank" rel="noopener">Yuklab olish</a>
             {% elif item.kitob.fayl %}
               <a class="btn btn-ochish" href="{{ url_for('ochish', bolim=item.bolim, idx=item.idx) }}">O'qish</a>
               <a class="btn btn-yuklash" href="{{ url_for('static', filename='files/' + item.kitob.fayl) }}" download>Yuklab</a>
@@ -576,9 +685,12 @@ HTML = """
       <input type="file" name="muqova" accept="image/*">
       <label>Kitob fayli (PDF):</label>
       <input type="file" name="fayl" accept=".pdf">
-      <label>Telegram kanalidagi kitob havolasi:</label>
-      <input type="url" name="telegram_havola" placeholder="https://t.me/kanal/123" required>
+      <label>Telegram kanalidagi kitob havolasi (ixtiyoriy):</label>
+      <input type="url" name="telegram_havola" placeholder="https://t.me/kanal/123">
       <small>Kitobni avval ochiq Telegram kanaliga yuklang, so'ng shu kanal yoki post havolasini kiriting.</small>
+      <label>Google Drive havolasi (ixtiyoriy):</label>
+      <input type="url" name="google_drive_havola" placeholder="https://drive.google.com/file/d/ID/view">
+      <small>Google Drive'dagi kitob havolasini kiriting. Kamida Telegram yoki Google Drive havolasi kerak.</small>
       <button type="submit">Saqlash</button>
     </form>
 
@@ -597,9 +709,12 @@ HTML = """
       <input type="file" name="muqova" accept="image/*">
       <label>Yangi kitob fayli (PDF, ixtiyoriy):</label>
       <input type="file" name="fayl" accept=".pdf">
-      <label>Telegram kanalidagi kitob havolasi:</label>
-      <input type="url" name="telegram_havola" value="{{ kitob.telegram_havola or '' }}" placeholder="https://t.me/kanal/123" required>
-      <small>Kitobning Telegram kanalidagi yangi havolasini kiriting.</small>
+      <label>Telegram kanalidagi kitob havolasi (ixtiyoriy):</label>
+      <input type="url" name="telegram_havola" value="{{ kitob.telegram_havola or '' }}" placeholder="https://t.me/kanal/123">
+      <small>Kitobning Telegram kanalidagi havolasini kiriting.</small>
+      <label>Google Drive havolasi (ixtiyoriy):</label>
+      <input type="url" name="google_drive_havola" value="{{ kitob.google_drive_havola or '' }}" placeholder="https://drive.google.com/file/d/ID/view">
+      <small>Kitobning Google Drive'dagi havolasini kiriting. Kamida Telegram yoki Google Drive havolasi kerak.</small>
       <button type="submit">Saqlash</button>
     </form>
 
@@ -614,12 +729,13 @@ HTML = """
       <h2>{{ kitob.nomi }} — {{ kitob.muallif }}</h2>
       <p style="color:#666">PDF hajmi: {{ fayl_hajmi(kitob.fayl) }}</p>
 
-      <div id="pdf-controls" style="background:#1a3a6e; padding:12px; border-radius:8px; margin:10px 0; display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:center; position:fixed; bottom:0; left:0; right:0; z-index:1000; box-shadow:0 -4px 12px rgba(0,0,0,0.2); color:white">
-        <button onclick="prevPage()" class="pdf-btn">◄ Oldingi</button>
+      <div id="pdf-controls" style="background:#1a3a6e; padding:12px; border-radius:8px; margin:10px 0; display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:space-between; position:fixed; bottom:0; left:0; right:0; z-index:1000; box-shadow:0 -4px 12px rgba(0,0,0,0.2); color:white">
+        <button onclick="qaytish()" class="btn-chiqish-pastki">⬅ Chiqish</button>
         <span style="display:flex; align-items:center; gap:5px">
           <input type="number" id="page-num" min="1" value="1" style="width:60px; padding:6px; text-align:center; border:1px solid #ddd; border-radius:4px">
           <span>/ <span id="page-count">0</span></span>
         </span>
+        <button onclick="prevPage()" class="pdf-btn">◄ Oldingi</button>
         <button onclick="nextPage()" class="pdf-btn">Keyingi ►</button>
         <button onclick="zoomOut()" class="pdf-btn">−</button>
         <input type="range" id="zoom-slider" min="50" max="200" value="100" step="10" style="width:120px" oninput="setZoom(this.value)">
@@ -628,7 +744,7 @@ HTML = """
         <input type="text" id="search-text" placeholder="Matn izlash..." style="padding:6px; border:1px solid #ddd; border-radius:4px; width:160px">
         <button onclick="searchPDF()" class="pdf-btn">🔍 Izlash</button>
         <span id="search-status" style="font-size:12px; color:#666"></span>
-        <a class="pdf-btn" href="{{ url_for('static', filename='files/' + kitob.fayl) }}" download style="background:#28a745; text-decoration:none">⬇ Yuklab</a>
+        <a class="pdf-btn btn-yuklab" href="{{ url_for('static', filename='files/' + kitob.fayl) }}" download style="background:#28a745; text-decoration:none">⬇ Yuklab</a>
       </div>
 
       <div id="pdf-canvas-wrap" style="position:relative; background:#555; padding:10px; border-radius:8px; margin-bottom:80px">
@@ -786,6 +902,32 @@ HTML = """
     .pdf-btn:hover { background:#f0f0f0 }
     #pdf-controls input[type="number"], #pdf-controls input[type="text"] { background:white; color:#333; border:1px solid #ccc }
     </style>
+
+  {% elif sahifa == 'ochish_drive' %}
+    <div class="reader">
+      <h2>{{ kitob.nomi }} — {{ kitob.muallif }}</h2>
+
+      <div id="drive-controls" style="display:flex; align-items:center; justify-content:space-between; align-content:center; position:fixed; bottom:0; left:0; right:0; z-index:1000; padding:14px 20px; background:linear-gradient(135deg, #1a3a6e, #2c5aa0); box-shadow:0 -4px 12px rgba(0,0,0,0.3); color:white">
+        <button onclick="qaytish()" class="btn-chiqish-pastki">⬅ Chiqish</button>
+        <a href="{{ drive_download }}" target="_blank" rel="noopener" class="btn-yuklab-ochish">⬇ Yuklab olish</a>
+      </div>
+
+      <div id="pdf-canvas-wrap" style="position:relative; background:#555; padding:10px; border-radius:8px; margin-bottom:70px">
+        <iframe src="{{ drive_preview }}" style="width:100%; height:600px; border:none; border-radius:8px" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+      </div>
+
+      <div id="pdf-loading" style="text-align:center; padding:20px; color:#1a3a6e">Yuklanmoqda...</div>
+    </div>
+
+    <script>
+    function qaytish() {
+      if (window.history.length > 1) window.history.back();
+      else window.location.href = "{{ url_for('bosh_sahifa') }}";
+    }
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') { e.preventDefault(); qaytish(); }
+    });
+    </script>
 
   {% elif sahifa == 'kirish' %}
     <form class="auth-form" method="post">
@@ -1032,15 +1174,22 @@ def qoshish():
         muallif = request.form.get("muallif", "").strip()
         yili = request.form.get("yili", "").strip()
         telegram_havola = request.form.get("telegram_havola", "").strip()
+        google_drive_havola = request.form.get("google_drive_havola", "").strip()
         if bolim not in BO_LIMLAR:
             flash("Noto'g'ri bo'lim tanlandi", "xato")
             return redirect(url_for("qoshish"))
         if not nomi or not muallif or not yili:
             flash("Kitob nomi, muallif va yili to'ldirilishi shart", "xato")
             return redirect(url_for("qoshish"))
-        if not telegram_havolasi_mi(telegram_havola):
-          flash("Telegram havolasi https://t.me/... yoki https://telegram.me/... ko'rinishida bo'lishi kerak", "xato")
-          return redirect(url_for("qoshish"))
+        if not telegram_havola and not google_drive_havola and not request.files.get("fayl"):
+            flash("Telegram havolasi, Google Drive havolasi yoki faylni kiriting", "xato")
+            return redirect(url_for("qoshish"))
+        if telegram_havola and not telegram_havolasi_mi(telegram_havola):
+            flash("Telegram havolasi https://t.me/... yoki https://telegram.me/... ko'rinishida bo'lishi kerak", "xato")
+            return redirect(url_for("qoshish"))
+        if google_drive_havola and not google_drive_havolasi_mi(google_drive_havola):
+            flash("Google Drive havolasi https://drive.google.com/file/d/ID/... ko'rinishida bo'lishi kerak", "xato")
+            return redirect(url_for("qoshish"))
         m = kitoblar_yuklash()
         muqova_nom = ""
         fayl_nom = ""
@@ -1061,6 +1210,7 @@ def qoshish():
             "muqova": muqova_nom,
             "fayl": fayl_nom,
             "telegram_havola": telegram_havola,
+            "google_drive_havola": google_drive_havola,
             "tomonidan": joriy_foydalanuvchi()["email"],
         })
         kitoblar_saqlash(m)
@@ -1087,16 +1237,24 @@ def tahrirlash(bolim, idx):
         muallif = request.form.get("muallif", "").strip()
         yili = request.form.get("yili", "").strip()
         telegram_havola = request.form.get("telegram_havola", "").strip()
+        google_drive_havola = request.form.get("google_drive_havola", "").strip()
         if not nomi or not muallif or not yili:
             flash("Kitob nomi, muallif va yili to'ldirilishi shart", "xato")
             return redirect(url_for("tahrirlash", bolim=bolim, idx=idx))
-        if not telegram_havolasi_mi(telegram_havola):
-          flash("Telegram havolasi https://t.me/... yoki https://telegram.me/... ko'rinishida bo'lishi kerak", "xato")
-          return redirect(url_for("tahrirlash", bolim=bolim, idx=idx))
+        if not telegram_havola and not google_drive_havola and not m[bolim][idx].get("fayl"):
+            flash("Telegram havolasi, Google Drive havolasi yoki faylni kiriting", "xato")
+            return redirect(url_for("tahrirlash", bolim=bolim, idx=idx))
+        if telegram_havola and not telegram_havolasi_mi(telegram_havola):
+            flash("Telegram havolasi https://t.me/... yoki https://telegram.me/... ko'rinishida bo'lishi kerak", "xato")
+            return redirect(url_for("tahrirlash", bolim=bolim, idx=idx))
+        if google_drive_havola and not google_drive_havolasi_mi(google_drive_havola):
+            flash("Google Drive havolasi https://drive.google.com/file/d/ID/... ko'rinishida bo'lishi kerak", "xato")
+            return redirect(url_for("tahrirlash", bolim=bolim, idx=idx))
         m[bolim][idx]["nomi"] = nomi
         m[bolim][idx]["muallif"] = muallif
         m[bolim][idx]["yili"] = yili
         m[bolim][idx]["telegram_havola"] = telegram_havola
+        m[bolim][idx]["google_drive_havola"] = google_drive_havola
         if "muqova" in request.files:
             f = request.files["muqova"]
             if f.filename:
@@ -1140,8 +1298,18 @@ def ochish(bolim, idx):
     if kitob is None:
         flash("Kitob topilmadi", "xato")
         return redirect(url_for("bosh_sahifa"))
-    return render_template_string(HTML, sahifa="ochish", bolimlar=BO_LIMLAR,
-                                   kitob=kitob, foydalanuvchi=joriy_foydalanuvchi())
+    if kitob.get("google_drive_havola"):
+        return render_template_string(HTML, sahifa="ochish_drive", bolimlar=BO_LIMLAR,
+                                       kitob=kitob, foydalanuvchi=joriy_foydalanuvchi(),
+                                       drive_preview=google_drive_preview_url(kitob.get("google_drive_havola")),
+                                       drive_download=google_drive_yuklab_url(kitob.get("google_drive_havola")))
+    if kitob.get("telegram_havola"):
+        return redirect(kitob["telegram_havola"])
+    if kitob.get("fayl"):
+        return render_template_string(HTML, sahifa="ochish", bolimlar=BO_LIMLAR,
+                                       kitob=kitob, foydalanuvchi=joriy_foydalanuvchi())
+    flash("Bu kitob uchun o'qish shabloni mavjud emas", "xato")
+    return redirect(url_for("bosh_sahifa"))
 
 
 if __name__ == "__main__":
