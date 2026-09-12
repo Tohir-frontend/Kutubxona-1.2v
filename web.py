@@ -554,7 +554,10 @@ HTML = """
               {% endif %}
               {% if foydalanuvchi and (kitob.tomonidan == foydalanuvchi.email or foydalanuvchi.rol == 'admin') %}
                 <a class="btn btn-tahrirlash" href="{{ url_for('tahrirlash', bolim=bolim, idx=loop.index0) }}">Tahrir</a>
-                <a class="btn btn-ochirish" href="{{ url_for('ochirish', bolim=bolim, idx=loop.index0) }}" onclick="return confirm('O\\'chirilsinmi?')">O'chirish</a>
+                <form method="post" action="{{ url_for('ochirish', bolim=bolim, idx=loop.index0) }}" style="display:inline" onsubmit="return confirm('O\'chirilsinmi?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-ochirish">O'chirish</button>
+                </form>
               {% endif %}
             </div>
           </div>
@@ -1272,7 +1275,7 @@ def tahrirlash(bolim, idx):
                                    kitob=kitob, foydalanuvchi=user)
 
 
-@app.route("/ochirish/<bolim>/<int:idx>")
+@app.route("/ochirish/<bolim>/<int:idx>", methods=["POST"])
 def ochirish(bolim, idx):
     user = joriy_foydalanuvchi()
     if not user:
