@@ -31,6 +31,15 @@ app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
 csrf = CSRFProtect(app)
 
+
+@app.after_request
+def kesh_taqiqlash(response):
+    """Brauzer keshi eski sahifani ko'rsatmasligi uchun."""
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 DATA_FILE = os.path.join(os.path.dirname(__file__), "kutubxona.json")
 USERS_FILE = os.path.join(os.path.dirname(__file__), "users.json")
 
@@ -385,10 +394,10 @@ HTML = """
   .karta-tana .qator { display: flex; justify-content: space-between; gap: 8px; }
   .karta-tana .yuklagan { font-size: 12px; color: #999; font-style: italic; }
   .tugmalar { margin-top: 10px; }
-  .tugma-qator { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; align-items: stretch; }
+  .tugma-qator { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px; }
   .tugma-qator:first-child { margin-top: 0; }
-  .btn { display: flex; align-items: center; justify-content: center; flex: 1 1 0; min-width: 70px; min-height: 34px; padding: 7px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; text-align: center; font-size: 12px; color: white; line-height: 1.2; }
-  .tugma-qator form { display: flex; flex: 1 1 0; min-width: 70px; margin: 0; }
+  .btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 34px; padding: 7px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; text-align: center; font-size: 12px; color: white; line-height: 1.2; }
+  .tugma-qator form { display: flex; margin: 0; min-width: 0; }
   .tugma-qator form .btn { width: 100%; }
   .btn-ochish { background: #1a3a6e; }
   .btn-yuklash { background: #28a745; }
@@ -446,7 +455,7 @@ HTML = """
     .karta-tana { padding: 10px; }
     .karta-tana h3 { font-size: 14px; }
     .karta-tana p { font-size: 12px; }
-    .btn { font-size: 11px; padding: 6px; min-width: 60px; }
+    .btn { font-size: 11px; padding: 6px; min-height: 30px; }
     .auth-form { padding: 18px; margin: 16px auto; max-width: 92%; }
     .qidiruv-form { flex-direction: column; }
     .karusel-slide img { height: 220px; }
