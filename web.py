@@ -130,6 +130,17 @@ def kod_yaratish():
     return "".join(random.choices(string.digits, k=6))
 
 
+def tel_norm(matn):
+    """Telefon raqamni +998 (xx) xxx-xx-xx formatiga keltiradi.
+    Noto'g'ri bo'lsa None qaytaradi. Masalan: +998901234567, 998 90 123 45 67, 901234567."""
+    raqamlar = "".join(c for c in (matn or "") if c.isdigit())
+    if len(raqamlar) == 9:
+        raqamlar = "998" + raqamlar
+    if len(raqamlar) == 12 and raqamlar.startswith("998"):
+        return f"+998 ({raqamlar[3:5]}) {raqamlar[5:8]}-{raqamlar[8:10]}-{raqamlar[10:12]}"
+    return None
+
+
 def email_sozlangan():
     """Gmail SMTP sozlangan bo'lsa True qaytaradi."""
     gmail = os.getenv("GMAIL")
@@ -1004,6 +1015,7 @@ HTML = """
       <input type="text" name="ism" placeholder="Ism" required>
       <input type="text" name="familiya" placeholder="Familiya" required>
       <input type="email" name="email" placeholder="Email" required>
+      <input type="tel" name="tel" placeholder="+998 (90) 123-45-67" required title="Format: +998 (xx) xxx-xx-xx">
       <input type="password" name="parol" placeholder="Parol (kamida 6 ta)" minlength="6" required>
       <button type="submit">Ro'yxatdan o'tish</button>
       <div class="auth-link">Akkauntingiz bormi? <a href="{{ url_for('kirish') }}">Kirish</a></div>
@@ -1033,6 +1045,7 @@ HTML = """
           <div>
             <b>{{ u.ism }} {{ u.familiya }}</b><br>
             <small style="color:#666">{{ u.email }}</small>
+            {% if u.tel %}<br><small style="color:#666">📱 {{ u.tel }}</small>{% endif %}
           </div>
           <a class="btn btn-tahrirlash" style="min-width:80px" href="{{ url_for('foydalanuvchi_tahrirlash', email=u.email) }}">Tahrir</a>
         </div>
@@ -1045,6 +1058,7 @@ HTML = """
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <h2>Yangi foydalanuvchi yaratish</h2>
       <input type="email" name="email" placeholder="Email (login sifatida)" required>
+      <input type="tel" name="tel" placeholder="Telefon (ixtiyoriy, +998 90 123-45-67)">
       <input type="text" name="ism" placeholder="Ism" required>
       <input type="text" name="familiya" placeholder="Familiya">
       <input type="password" name="parol" placeholder="Parol (kamida 6 belgi)" required minlength="6">
@@ -1059,6 +1073,8 @@ HTML = """
       <h2>Foydalanuvchini tahrirlash</h2>
       <label>Email (login):</label>
       <input type="email" value="{{ tahrir_email }}" disabled>
+      <label>Telefon raqam (+998 (xx) xxx-xx-xx, ixtiyoriy):</label>
+      <input type="tel" name="tel" value="{{ tahrir_malumot.tel or '' }}" placeholder="+998 (90) 123-45-67">
       <label>Ism:</label>
       <input type="text" name="ism" value="{{ tahrir_malumot.ism }}" required>
       <label>Familiya:</label>
@@ -1187,9 +1203,14 @@ def royxat():
         email = request.form.get("email", "").lower().strip()
         ism = request.form.get("ism", "").strip()
         familiya = request.form.get("familiya", "").strip()
+        tel = request.form.get("tel", "").strip()
         parol = request.form.get("parol", "")
+        tel_sozlangan = tel_norm(tel)
         if not email or not ism or not familiya or not parol:
             flash("Barcha maydonlarni to'ldiring", "xato")
+            return redirect(url_for("royxat"))
+        if not tel_sozlangan:
+            flash("Telefon raqam +998 (xx) xxx-xx-xx formatida bo'lishi kerak", "xato")
             return redirect(url_for("royxat"))
         if len(parol) < 6:
             flash("Parol kamida 6 belgidan iborat bo'lishi kerak", "xato")
@@ -1205,6 +1226,7 @@ def royxat():
         f["tasdiqlanmaganlar"][email] = {
             "ism": ism,
             "familiya": familiya,
+            "tel": tel_sozlangan,
             "parol": generate_password_hash(parol),
             "kod": kod,
         }
@@ -1289,6 +1311,7 @@ def foydalanuvchilar_sahifa():
             "email": email,
             "ism": malumot.get("ism", ""),
             "familiya": malumot.get("familiya", ""),
+            "tel": malumot.get("tel", ""),
         })
     royxat.sort(key=lambda u: u["email"])
     return render_template_string(HTML, sahifa="foydalanuvchilar", foydalanuvchilar=royxat,
@@ -1303,9 +1326,14 @@ def foydalanuvchi_yaratish():
     email = request.form.get("email", "").lower().strip()
     ism = request.form.get("ism", "").strip()
     familiya = request.form.get("familiya", "").strip()
+    tel = request.form.get("tel", "").strip()
     parol = request.form.get("parol", "")
+    tel_sozlangan = tel_norm(tel) if tel else ""
     if not email or not ism or not parol:
         flash("Email, ism va parol to'ldirilishi shart", "xato")
+        return redirect(url_for("foydalanuvchilar_sahifa"))
+    if tel and not tel_sozlangan:
+        flash("Telefon raqam +998 (xx) xxx-xx-xx formatida bo'lishi kerak", "xato")
         return redirect(url_for("foydalanuvchilar_sahifa"))
     if len(parol) < 6:
         flash("Parol kamida 6 belgidan iborat bo'lishi kerak", "xato")
@@ -1320,6 +1348,7 @@ def foydalanuvchi_yaratish():
     f["faollar"][email] = {
         "ism": ism,
         "familiya": familiya,
+        "tel": tel_sozlangan,
         "parol": generate_password_hash(parol),
     }
     foydalanuvchilar_saqlash(f)
@@ -1340,12 +1369,18 @@ def foydalanuvchi_tahrirlash(email):
     if request.method == "POST":
         ism = request.form.get("ism", "").strip()
         familiya = request.form.get("familiya", "").strip()
+        tel = request.form.get("tel", "").strip()
         yangi_parol = request.form.get("parol", "")
+        tel_sozlangan = tel_norm(tel) if tel else ""
         if not ism or not familiya:
             flash("Ism va familiya to'ldirilishi shart", "xato")
             return redirect(url_for("foydalanuvchi_tahrirlash", email=email))
+        if tel and not tel_sozlangan:
+            flash("Telefon raqam +998 (xx) xxx-xx-xx formatida bo'lishi kerak", "xato")
+            return redirect(url_for("foydalanuvchi_tahrirlash", email=email))
         f["faollar"][email]["ism"] = ism
         f["faollar"][email]["familiya"] = familiya
+        f["faollar"][email]["tel"] = tel_sozlangan
         if yangi_parol:
             if len(yangi_parol) < 6:
                 flash("Yangi parol kamida 6 belgidan iborat bo'lishi kerak", "xato")
