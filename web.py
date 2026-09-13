@@ -130,6 +130,13 @@ def kod_yaratish():
     return "".join(random.choices(string.digits, k=6))
 
 
+def email_sozlangan():
+    """Gmail SMTP sozlangan bo'lsa True qaytaradi."""
+    gmail = os.getenv("GMAIL")
+    parol = os.getenv("APP_PASSWORD")
+    return bool(gmail and parol and "your_" not in gmail)
+
+
 def email_yuborish(manzil, kod):
     """Gmail SMTP orqali tasdiqlash kodini yuboradi"""
     import smtplib
@@ -138,8 +145,8 @@ def email_yuborish(manzil, kod):
     gmail = os.getenv("GMAIL")
     parol = os.getenv("APP_PASSWORD")
 
-    if not gmail or not parol or "your_" in gmail:
-        print(f"[DEMO] {manzil} -> tasdiqlash kodi: {kod}")
+    if not email_sozlangan():
+        print(f"[DEMO] {manzil} -> tasdiqlash kodi: {kod}", flush=True)
         return False
 
     msg = MIMEText(
@@ -381,6 +388,7 @@ HTML = """
   .flash { padding: 12px; border-radius: 6px; margin: 10px auto; max-width: 600px; text-align: center; }
   .flash-muvaffaqiyat { background: #d4edda; color: #155724; }
   .flash-xato { background: #f8d7da; color: #721c24; }
+  .flash-malumot { background: #fff3cd; color: #856404; }
   .auth-form { background: #fff; padding: 30px; border-radius: 10px; max-width: 450px; margin: 30px auto; }
   .auth-form h2 { text-align: center; color: #1a3a6e; margin-top: 0; }
   .auth-form input, .auth-form select { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; }
@@ -971,13 +979,18 @@ HTML = """
     </form>
 
   {% elif sahifa == 'tasdiqlash' %}
-    <form class="auth-form" method="post">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <h2>Email tasdiqlash</h2>
-      <p style="text-align:center">{{ email }} manziliga yuborilgan 6 xonali kodni kiriting</p>
-      <input type="text" name="kod" placeholder="123456" maxlength="6" required style="text-align:center; font-size:20px; letter-spacing:5px">
-      <button type="submit">Tasdiqlash</button>
-    </form>
+      <form class="auth-form" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <h2>Email tasdiqlash</h2>
+        <p style="text-align:center">{{ email }} manziliga yuborilgan 6 xonali kodni kiriting</p>
+        {% if demo_kod %}
+        <p style="text-align:center; background:#fff3cd; color:#856404; padding:10px; border-radius:6px">
+          Email sozlanmagan (demo rejim).<br>Tasdiqlash kodi: <b style="font-size:20px; letter-spacing:3px">{{ demo_kod }}</b>
+        </p>
+        {% endif %}
+        <input type="text" name="kod" placeholder="123456" maxlength="6" required style="text-align:center; font-size:20px; letter-spacing:5px">
+        <button type="submit">Tasdiqlash</button>
+      </form>
   {% endif %}
 </div>
 
@@ -1123,7 +1136,9 @@ def royxat():
         yuborildi = email_yuborish(email, kod)
         admin_ga_royxat_xabari(ism, familiya, email, kod, yuborildi)
         session["tasdiqlash_email"] = email
-        if eski_bor:
+        if not email_sozlangan():
+            flash("Email sozlanmagan (demo rejim). Tasdiqlash kodi keyingi sahifada ko'rsatiladi.", "malumot")
+        elif eski_bor:
             flash("Eski akkaunt o'chirildi. Yangi tasdiqlash kodi yuborildi.", "muvaffaqiyat")
         elif not yuborildi:
             flash("Email yuborilmadi. Administrator bilan bog'laning.", "xato")
@@ -1150,7 +1165,11 @@ def tasdiqlash():
                 return redirect(url_for("bosh_sahifa"))
             else:
                 flash("Kod noto'g'ri", "xato")
+    demo_kod = None
+    if not email_sozlangan() and email in f["tasdiqlanmaganlar"]:
+        demo_kod = f["tasdiqlanmaganlar"][email]["kod"]
     return render_template_string(HTML, sahifa="tasdiqlash", email=email,
+                                   demo_kod=demo_kod,
                                    foydalanuvchi=joriy_foydalanuvchi())
 
 
