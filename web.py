@@ -272,6 +272,31 @@ def fayllarni_tozalash(ochirilgan_kitob, qolgan_m):
             os.remove(yol)
 
 
+def yetim_fayllarni_tozalash(m):
+    """Kitoblar bilan bog'lanmagan (yetim) muqova va fayllarni diskdan o'chiradi."""
+    ishlatilgan_muqova = set()
+    ishlatilgan_fayl = set()
+    for kitoblar in m.values():
+        for k in kitoblar:
+            if k.get("muqova"):
+                ishlatilgan_muqova.add(k["muqova"])
+            if k.get("fayl"):
+                ishlatilgan_fayl.add(k["fayl"])
+    for papka_yol, ishlatilgan in (
+        (app.config["COVER_FOLDER"], ishlatilgan_muqova),
+        (app.config["UPLOAD_FOLDER"], ishlatilgan_fayl),
+    ):
+        if not os.path.isdir(papka_yol):
+            continue
+        for fayl in os.listdir(papka_yol):
+            yol = os.path.join(papka_yol, fayl)
+            if os.path.isfile(yol) and fayl not in ishlatilgan:
+                try:
+                    os.remove(yol)
+                except OSError:
+                    pass
+
+
 def bolim_slug(bolim):
     """Bo'lim nomini HTML id sifatida ishlatish uchun xavfsiz qatorga aylantiradi."""
     if not bolim:
@@ -1328,6 +1353,7 @@ def ochirish(bolim, idx):
     m[bolim].pop(idx)
     kitoblar_saqlash(m)
     fayllarni_tozalash(kitob, m)
+    yetim_fayllarni_tozalash(m)
     return redirect(url_for("bosh_sahifa", _anchor=bolim_slug(bolim)))
 
 
