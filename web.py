@@ -152,10 +152,17 @@ def email_yuborish(manzil, kod):
     msg["To"] = manzil
 
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(gmail, parol)
-            server.send_message(msg)
-        return True
+        try:
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=20) as server:
+                server.login(gmail, parol)
+                server.send_message(msg)
+            return True
+        except Exception:
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=20) as server:
+                server.starttls()
+                server.login(gmail, parol)
+                server.send_message(msg)
+            return True
     except Exception as e:
         print(f"Email yuborishda xato: {e}")
         print(f"[DEMO REJIM] {manzil} -> tasdiqlash kodi: {kod}")
