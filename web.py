@@ -511,6 +511,14 @@ HTML = """
   .karusel-slide { min-width: 100%; display: flex; align-items: center; justify-content: center; background: #000 }
   .karusel-slide img { width: 100%; height: 400px; object-fit: contain; display: block }
 
+  @media (max-width: 1200px) {
+    .kitoblar { grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  }
+
+  @media (max-width: 950px) {
+    .kitoblar { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  }
+
   @media (max-width: 700px) {
     .header-inner { flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 12px; }
     .header h1 { font-size: 18px; }
@@ -520,7 +528,6 @@ HTML = """
     .nav a { margin: 0 6px; font-size: 14px; display: inline-block; }
     .bolim-sarlavha { padding: 10px; margin: 14px 0 8px; }
     .bolim-sarlavha h2 { font-size: 17px; }
-    .kitoblar { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
     .muqora { height: 126px; }
     .kitob-ikon { font-size: 56px; }
     .yulduzcha { width: 28px; height: 28px; font-size: 16px; }
@@ -537,6 +544,10 @@ HTML = """
     #pdf-controls { position: static !important; box-shadow: none !important; border-radius: 8px !important; justify-content: center !important; }
     #pdf-canvas-wrap { margin-bottom: 20px !important; }
     #search-text { width: 100% !important; }
+  }
+
+  @media (max-width: 620px) {
+    .kitoblar { grid-template-columns: repeat(2, 1fr); gap: 12px; }
   }
 
   @media (max-width: 480px) {
