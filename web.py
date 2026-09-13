@@ -396,12 +396,12 @@ HTML = """
   .tugmalar { margin-top: 10px; }
   .tugma-qator { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px; }
   .tugma-qator:first-child { margin-top: 0; }
-  .btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 34px; padding: 7px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; text-align: center; font-size: 12px; color: white; line-height: 1.2; }
+  .btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 34px; padding: 7px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; text-align: center; font-size: 12px; font-family: inherit; color: white; line-height: 1.2; }
   .tugma-qator form { display: flex; margin: 0; min-width: 0; }
   .tugma-qator form .btn { width: 100%; }
   .btn-ochish { background: #1a3a6e; }
   .btn-yuklash { background: #28a745; }
-  .btn-tahrirlash { background: #ffc107; color: #333; }
+  .btn-tahrirlash { background: #ffc107; }
   .btn-ochirish { background: #dc3545; }
   form { background: #fff; padding: 20px; border-radius: 10px; margin: 20px 0; }
   form input, form select { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 6px; }
