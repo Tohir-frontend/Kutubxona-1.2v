@@ -397,7 +397,7 @@ HTML = """
   .tugma-qator { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px; }
   .tugma-qator:first-child { margin-top: 0; }
   .btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 34px; padding: 7px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; text-align: center; font-size: 12px; font-family: inherit; color: white; line-height: 1.2; }
-  .tugma-qator form { display: flex; margin: 0; min-width: 0; }
+  .tugma-qator form { display: flex; margin: 0; min-width: 0; padding: 0; background: none; border-radius: 0; }
   .tugma-qator form .btn { width: 100%; }
   .btn-ochish { background: #1a3a6e; }
   .btn-yuklash { background: #28a745; }
