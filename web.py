@@ -549,6 +549,9 @@ HTML = """
       {% if foydalanuvchi %}
         <a href="{{ url_for('qoshish') }}">Kitob qo'shish</a>
         <a href="{{ url_for('sevimlilar_sahifa') }}">★ Sevimlilarim</a>
+        {% if foydalanuvchi.rol == 'admin' %}
+          <a href="{{ url_for('foydalanuvchilar_sahifa') }}">👥 Foydalanuvchilar</a>
+        {% endif %}
       {% endif %}
     </div>
 
@@ -1019,6 +1022,51 @@ HTML = """
         <input type="text" name="kod" placeholder="123456" maxlength="6" required style="text-align:center; font-size:20px; letter-spacing:5px">
         <button type="submit">Tasdiqlash</button>
       </form>
+
+  {% elif sahifa == 'foydalanuvchilar' %}
+    <div class="nav"><a href="{{ url_for('bosh_sahifa') }}">Bosh sahifa</a></div>
+    <h2 style="color:white">👥 Foydalanuvchilar ({{ foydalanuvchilar|length }} ta)</h2>
+    <div class="auth-form">
+      <h2>Ro'yxatdan o'tganlar</h2>
+      {% for u in foydalanuvchilar %}
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee">
+          <div>
+            <b>{{ u.ism }} {{ u.familiya }}</b><br>
+            <small style="color:#666">{{ u.email }}</small>
+          </div>
+          <a class="btn btn-tahrirlash" style="min-width:80px" href="{{ url_for('foydalanuvchi_tahrirlash', email=u.email) }}">Tahrir</a>
+        </div>
+      {% else %}
+        <p style="color:#666; text-align:center">Hozircha foydalanuvchi yo'q.</p>
+      {% endfor %}
+    </div>
+
+    <form class="auth-form" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2>Yangi foydalanuvchi yaratish</h2>
+      <input type="email" name="email" placeholder="Email (login sifatida)" required>
+      <input type="text" name="ism" placeholder="Ism" required>
+      <input type="text" name="familiya" placeholder="Familiya">
+      <input type="password" name="parol" placeholder="Parol (kamida 6 belgi)" required minlength="6">
+      <button type="submit">Yaratish</button>
+      <small>Email tasdiqlash talab qilinmaydi — foydalanuvchi kiritilgan login/parol bilan darhol kirishi mumkin.</small>
+    </form>
+
+  {% elif sahifa == 'foydalanuvchi_tahrirlash' %}
+    <div class="nav"><a href="{{ url_for('foydalanuvchilar_sahifa') }}">👥 Foydalanuvchilar</a></div>
+    <form class="auth-form" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2>Foydalanuvchini tahrirlash</h2>
+      <label>Email (login):</label>
+      <input type="email" value="{{ tahrir_email }}" disabled>
+      <label>Ism:</label>
+      <input type="text" name="ism" value="{{ tahrir_malumot.ism }}" required>
+      <label>Familiya:</label>
+      <input type="text" name="familiya" value="{{ tahrir_malumot.familiya or '' }}">
+      <label>Yangi parol (ixtiyoriy — bo'sh qoldirilsa o'zgarmaydi):</label>
+      <input type="password" name="parol" placeholder="Yangi parol" minlength="6">
+      <button type="submit">Saqlash</button>
+    </form>
   {% endif %}
 </div>
 
@@ -1227,6 +1275,89 @@ def kirish():
 def chiqish():
     session.clear()
     return redirect(url_for("bosh_sahifa"))
+
+
+@app.route("/foydalanuvchilar")
+def foydalanuvchilar_sahifa():
+    if not admin_mi():
+        flash("Bu sahifa faqat admin uchun", "xato")
+        return redirect(url_for("bosh_sahifa"))
+    f = foydalanuvchilar_yuklash()
+    royxat = []
+    for email, malumot in f["faollar"].items():
+        royxat.append({
+            "email": email,
+            "ism": malumot.get("ism", ""),
+            "familiya": malumot.get("familiya", ""),
+        })
+    royxat.sort(key=lambda u: u["email"])
+    return render_template_string(HTML, sahifa="foydalanuvchilar", foydalanuvchilar=royxat,
+                                   foydalanuvchi=joriy_foydalanuvchi())
+
+
+@app.route("/foydalanuvchi/yaratish", methods=["POST"])
+def foydalanuvchi_yaratish():
+    if not admin_mi():
+        flash("Bu amal faqat admin uchun", "xato")
+        return redirect(url_for("bosh_sahifa"))
+    email = request.form.get("email", "").lower().strip()
+    ism = request.form.get("ism", "").strip()
+    familiya = request.form.get("familiya", "").strip()
+    parol = request.form.get("parol", "")
+    if not email or not ism or not parol:
+        flash("Email, ism va parol to'ldirilishi shart", "xato")
+        return redirect(url_for("foydalanuvchilar_sahifa"))
+    if len(parol) < 6:
+        flash("Parol kamida 6 belgidan iborat bo'lishi kerak", "xato")
+        return redirect(url_for("foydalanuvchilar_sahifa"))
+    if email == ADMIN_LOGIN:
+        flash("Bu email admin uchun band, boshqa email tanlang", "xato")
+        return redirect(url_for("foydalanuvchilar_sahifa"))
+    f = foydalanuvchilar_yuklash()
+    if email in f["faollar"] or email in f["tasdiqlanmaganlar"]:
+        flash("Bu email allaqachon mavjud", "xato")
+        return redirect(url_for("foydalanuvchilar_sahifa"))
+    f["faollar"][email] = {
+        "ism": ism,
+        "familiya": familiya,
+        "parol": generate_password_hash(parol),
+    }
+    foydalanuvchilar_saqlash(f)
+    flash(f"Foydalanuvchi yaratildi: {email} (login: {email}, parol: kiritilgan parol)", "muvaffaqiyat")
+    return redirect(url_for("foydalanuvchilar_sahifa"))
+
+
+@app.route("/foydalanuvchi/tahrirlash/<email>", methods=["GET", "POST"])
+def foydalanuvchi_tahrirlash(email):
+    if not admin_mi():
+        flash("Faqat admin foydalanuvchilarni tahrirlashi mumkin", "xato")
+        return redirect(url_for("bosh_sahifa"))
+    email = email.lower()
+    f = foydalanuvchilar_yuklash()
+    if email not in f["faollar"]:
+        flash("Foydalanuvchi topilmadi", "xato")
+        return redirect(url_for("foydalanuvchilar_sahifa"))
+    if request.method == "POST":
+        ism = request.form.get("ism", "").strip()
+        familiya = request.form.get("familiya", "").strip()
+        yangi_parol = request.form.get("parol", "")
+        if not ism or not familiya:
+            flash("Ism va familiya to'ldirilishi shart", "xato")
+            return redirect(url_for("foydalanuvchi_tahrirlash", email=email))
+        f["faollar"][email]["ism"] = ism
+        f["faollar"][email]["familiya"] = familiya
+        if yangi_parol:
+            if len(yangi_parol) < 6:
+                flash("Yangi parol kamida 6 belgidan iborat bo'lishi kerak", "xato")
+                return redirect(url_for("foydalanuvchi_tahrirlash", email=email))
+            f["faollar"][email]["parol"] = generate_password_hash(yangi_parol)
+        foydalanuvchilar_saqlash(f)
+        flash("Foydalanuvchi ma'lumotlari saqlandi", "muvaffaqiyat")
+        return redirect(url_for("foydalanuvchilar_sahifa"))
+    return render_template_string(HTML, sahifa="foydalanuvchi_tahrirlash",
+                                   tahrir_email=email,
+                                   tahrir_malumot=f["faollar"][email],
+                                   foydalanuvchi=joriy_foydalanuvchi())
 
 
 @app.route("/qoshish", methods=["GET", "POST"])
