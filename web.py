@@ -539,11 +539,22 @@ HTML = """
     #search-text { width: 100% !important; }
   }
 
-  @media (max-width: 420px) {
-    .kitoblar { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
-    .muqova { height: 98px; }
-    .kitob-ikon { font-size: 42px; }
+  @media (max-width: 480px) {
+    .kitoblar { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .container { padding: 8px; }
+    .muqora { height: 150px; }
+    .kitob-ikon { font-size: 54px; }
+    .yulduzcha { width: 26px; height: 26px; font-size: 14px; }
+    .karta-tana { padding: 8px; }
+    .karta-tana h3 { font-size: 13px; }
+    .karta-tana p { font-size: 11px; }
+    .btn { font-size: 10px; padding: 5px 3px; min-height: 28px; }
     #search-status { display: none; }
+  }
+
+  @media (min-width: 1600px) {
+    .container, .header-inner { max-width: 1500px; }
+    .karusel-slide img { height: 500px; }
   }
 </style>
 </head>
