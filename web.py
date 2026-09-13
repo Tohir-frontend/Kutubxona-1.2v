@@ -729,7 +729,7 @@ HTML = """
 
   {% elif sahifa == 'tahrirlash' %}
     <div class="nav"><a href="{{ url_for('bosh_sahifa') }}">Bosh sahifa</a></div>
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <h2>Kitobni tahrirlash</h2>
       <label>Nomi:</label>
@@ -738,6 +738,9 @@ HTML = """
       <input type="text" name="muallif" value="{{ kitob.muallif }}" required>
         <label>Yili:</label>
         <input type="text" name="yili" value="{{ kitob.yili }}" required>
+        <label>Muqova rasmi (ixtiyoriy, max 0.3 MB):</label>
+        <input type="file" name="muqova" accept="image/*" onchange="if(this.files[0] && this.files[0].size > 0.3*1024*1024){ alert('Rasm hajmi 0.3 MB dan katta! Kichikroq rasm tanlang.'); this.value=''; }">
+        {% if kitob.muqova %}<small>Hozirgi rasm: {{ kitob.muqova }} — yangi rasm tanlasangiz almashtiriladi.</small>{% endif %}
         <label>Telegram kanalidagi kitob havolasi (ixtiyoriy):</label>
         <input type="url" name="telegram_havola" value="{{ kitob.telegram_havola or '' }}" placeholder="https://t.me/kanal/123">
         <label>Google Drive'dagi kitob havolasini kiriting.</label>
@@ -1285,6 +1288,19 @@ def tahrirlash(bolim, idx):
         if google_drive_havola and not google_drive_havolasi_mi(google_drive_havola):
             flash("Google Drive havolasi https://drive.google.com/file/d/ID/... ko'rinishida bo'lishi kerak", "xato")
             return redirect(url_for("tahrirlash", bolim=bolim, idx=idx))
+        f = request.files.get("muqova")
+        if f and f.filename:
+            rasm = f.read()
+            if len(rasm) > MAX_RASM_HAJM:
+                flash("Rasm hajmi 0.3 MB dan katta bo'lmasligi kerak", "xato")
+                return redirect(url_for("tahrirlash", bolim=bolim, idx=idx))
+            eski_muqova = m[bolim][idx].get("muqova")
+            yangi_muqova = secure_filename(f.filename)
+            with open(os.path.join(app.config["COVER_FOLDER"], yangi_muqova), "wb") as out:
+                out.write(rasm)
+            m[bolim][idx]["muqova"] = yangi_muqova
+            if eski_muqova and eski_muqova != yangi_muqova:
+                fayllarni_tozalash({"muqova": eski_muqova}, m)
         m[bolim][idx]["nomi"] = nomi
         m[bolim][idx]["muallif"] = muallif
         m[bolim][idx]["yili"] = yili
