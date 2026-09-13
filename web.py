@@ -765,7 +765,7 @@ HTML = """
     <h2 style="color:white">🎧 Audio kitoblar ({{ audiolilar|length }} ta)</h2>
 
     {% if foydalanuvchi %}
-    <form method="post">
+    <form method="post" action="{{ url_for('audio_qoshish') }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <h2>Yangi audio kitob qo'shish</h2>
       <label>Kitob nomi:</label>
