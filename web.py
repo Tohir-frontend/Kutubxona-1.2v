@@ -135,7 +135,7 @@ def texnikum_rasmlari():
     if not os.path.exists(papka):
         return []
     rasm_turlari = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
-    tartib = {"texnikum 1": 0, "kitob": 1, "texnikum 2": 2}
+    tartib = {"texnikum1": 0, "kitob": 1, "texnikum2": 2}
     rasmlar = [f for f in os.listdir(papka) if os.path.splitext(f)[1].lower() in rasm_turlari]
     return sorted(
         rasmlar,
@@ -448,9 +448,9 @@ HTML = """
   .auth-form button { width: 100%; background: #1a3a6e; color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }
   .auth-link { text-align: center; margin-top: 15px; }
   .auth-link a { color: #1a3a6e; }
-  .bolim-sarlavha { color: white; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 10px; margin: 20px 0 10px; }
-  .kitoblar { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
-  .karta { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+  .bolim-sarlavha { color: white; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 10px; margin: 20px 0 10px; scroll-margin-top: 80px; }
+  .kitoblar { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; align-items: stretch; }
+  .karta { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; flex-direction: column; height: 100%; }
   .muqora { position: relative; width: 100%; height: 196px; background: linear-gradient(135deg, #1a3a6e, #2c5aa0); display: flex; align-items: center; justify-content: center; color: white; overflow: hidden }
   .kitob-ikon { font-size: 84px; line-height: 1; transition: transform 0.2s, opacity 0.2s; }
   .muqora img { width: 100%; height: 100%; object-fit: contain }
@@ -460,12 +460,12 @@ HTML = """
   .yulduzcha { position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; font-size: 20px; text-decoration: none; color: #fff; line-height: 1; transition: transform 0.15s, background 0.15s; }
   .yulduzcha:hover { transform: scale(1.15); background: rgba(0,0,0,0.65); }
   .yulduzcha.faol { color: #ffc107; }
-  .karta-tana { padding: 15px; }
+  .karta-tana { padding: 15px; display: flex; flex-direction: column; flex: 1; min-height: 0; }
   .karta-tana h3 { margin: 0 0 8px; color: #1a3a6e; font-size: 16px; }
   .karta-tana p { margin: 4px 0; color: #666; font-size: 14px; }
   .karta-tana .qator { display: flex; justify-content: space-between; gap: 8px; }
   .karta-tana .yuklagan { font-size: 12px; color: #999; font-style: italic; }
-  .tugmalar { margin-top: 10px; }
+  .tugmalar { margin-top: auto; padding-top: 10px; }
   .tugma-qator { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px; }
   .tugma-qator:first-child { margin-top: 0; }
   .btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 34px; padding: 7px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; text-align: center; font-size: 12px; font-family: inherit; color: white; line-height: 1.2; }
@@ -596,7 +596,7 @@ HTML = """
     <div class="nav">
       <a href="{{ url_for('bosh_sahifa') }}">Bosh sahifa</a>
       <a href="{{ url_for('qidirish') }}">Qidirish</a>
-      <a href="{{ url_for('audio_sahifa') }}">🎧 Audio kitoblar</a>
+      <a href="#audio-kitoblar">🎧 Audio kitoblar</a>
       {% if foydalanuvchi %}
         <a href="{{ url_for('qoshish') }}">Kitob qo'shish</a>
         <a href="{{ url_for('sevimlilar_sahifa') }}">★ Sevimlilarim</a>
@@ -680,6 +680,60 @@ HTML = """
       </div>
       {% endif %}
     {% endfor %}
+
+    <div class="bolim-sarlavha" id="audio-kitoblar">
+      <h2 style="margin:0">🎧 Audio kitoblar <small>({{ (audiollar or [])|length }} ta)</small></h2>
+    </div>
+    {% if foydalanuvchi %}
+    <form method="post" action="{{ url_for('audio_qoshish') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2>Yangi audio kitob qo'shish</h2>
+      <label>Kitob nomi:</label>
+      <input type="text" name="nomi" required>
+      <label>Muallif (ixtiyoriy):</label>
+      <input type="text" name="muallif">
+      <label>Telegram havolasi (ixtiyoriy):</label>
+      <input type="url" name="telegram_havola" placeholder="https://t.me/kanal/123">
+      <label>Google Drive'dagi audio kitob havolasini kiriting.</label>
+      <input type="url" name="google_drive_havola" placeholder="https://drive.google.com/file/d/ID/view" required>
+      <button type="submit">Saqlash</button>
+    </form>
+    {% endif %}
+    {% if audiollar %}
+    <div class="kitoblar">
+      {% for a in audiollar %}
+      <div class="karta">
+        <div class="karta-tana">
+          <h3>{{ a.nomi }}</h3>
+          <p class="qator"><span>{{ a.muallif or 'Noma\u2019lum muallif' }}</span><span>🎧 Audio</span></p>
+          <p class="qator yuklagan"><span>{% if a.google_drive_havola %}Google Drive{% elif a.telegram_havola %}Telegram kanal{% endif %}</span><span>{{ foydalanuvchi_ismi(a.tomonidan) }}</span></p>
+          <div class="tugmalar">
+            <div class="tugma-qator">
+              {% if a.google_drive_havola %}
+                <a class="btn btn-ochish" href="{{ google_drive_preview_url(a.google_drive_havola) }}" target="_blank" rel="noopener">🎧 Eshitish</a>
+                <a class="btn btn-yuklash" href="{{ google_drive_yuklab_url(a.google_drive_havola) }}" target="_blank" rel="noopener">Yuklab olish</a>
+              {% elif a.telegram_havola %}
+                <a class="btn btn-ochish" href="{{ a.telegram_havola }}" target="_blank" rel="noopener">🎧 Eshitish</a>
+                <a class="btn btn-yuklash" href="{{ a.telegram_havola }}" target="_blank" rel="noopener">Yuklab olish</a>
+              {% endif %}
+            </div>
+            {% if foydalanuvchi and (a.tomonidan == foydalanuvchi.email or foydalanuvchi.rol == 'admin') %}
+              <div class="tugma-qator">
+                <a class="btn btn-tahrirlash" href="{{ url_for('audio_tahrirlash', idx=loop.index0) }}">Tahrir</a>
+                <form method="post" action="{{ url_for('audio_ochirish', idx=loop.index0) }}" onsubmit="return confirm(&quot;O'chirilsinmi?&quot;)">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-ochirish">O'chirish</button>
+                </form>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p style="color:white; text-align:center; margin-top:20px">Hozircha audio kitob yo'q.</p>
+    {% endif %}
 
   {% elif sahifa == 'qidirish' %}
     <div class="nav"><a href="{{ url_for('bosh_sahifa') }}">Bosh sahifa</a></div>
@@ -782,64 +836,8 @@ HTML = """
     <p style="color:white; text-align:center; margin-top:20px">Sevimlilar ro'yxati bo'sh. Kitoblar ustidagi ☆ belgisini bosib qo'shing.</p>
     {% endif %}
 
-  {% elif sahifa == 'audio' %}
-    <div class="nav"><a href="{{ url_for('bosh_sahifa') }}">Bosh sahifa</a></div>
-    <h2 style="color:white">🎧 Audio kitoblar ({{ audiolilar|length }} ta)</h2>
-
-    {% if foydalanuvchi %}
-    <form method="post" action="{{ url_for('audio_qoshish') }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <h2>Yangi audio kitob qo'shish</h2>
-      <label>Kitob nomi:</label>
-      <input type="text" name="nomi" required>
-      <label>Muallif (ixtiyoriy):</label>
-      <input type="text" name="muallif">
-      <label>Telegram havolasi (ixtiyoriy):</label>
-      <input type="url" name="telegram_havola" placeholder="https://t.me/kanal/123">
-      <label>Google Drive'dagi audio kitob havolasini kiriting.</label>
-      <input type="url" name="google_drive_havola" placeholder="https://drive.google.com/file/d/ID/view" required>
-      <button type="submit">Saqlash</button>
-    </form>
-    {% endif %}
-
-    {% if audiollar %}
-    <div class="kitoblar">
-      {% for a in audiollar %}
-      <div class="karta">
-        <div class="karta-tana">
-          <h3>{{ a.nomi }}</h3>
-          <p class="qator"><span>{{ a.muallif or 'Noma\u2019lum muallif' }}</span><span>🎧 Audio</span></p>
-          <p class="qator yuklagan"><span>{% if a.google_drive_havola %}Google Drive{% elif a.telegram_havola %}Telegram kanal{% endif %}</span><span>{{ foydalanuvchi_ismi(a.tomonidan) }}</span></p>
-          <div class="tugmalar">
-            <div class="tugma-qator">
-              {% if a.google_drive_havola %}
-                <a class="btn btn-ochish" href="{{ google_drive_preview_url(a.google_drive_havola) }}" target="_blank" rel="noopener">🎧 Eshitish</a>
-                <a class="btn btn-yuklash" href="{{ google_drive_yuklab_url(a.google_drive_havola) }}" target="_blank" rel="noopener">Yuklab olish</a>
-              {% elif a.telegram_havola %}
-                <a class="btn btn-ochish" href="{{ a.telegram_havola }}" target="_blank" rel="noopener">🎧 Eshitish</a>
-                <a class="btn btn-yuklash" href="{{ a.telegram_havola }}" target="_blank" rel="noopener">Yuklab olish</a>
-              {% endif %}
-            </div>
-            {% if foydalanuvchi and (a.tomonidan == foydalanuvchi.email or foydalanuvchi.rol == 'admin') %}
-              <div class="tugma-qator">
-                <a class="btn btn-tahrirlash" href="{{ url_for('audio_tahrirlash', idx=loop.index0) }}">Tahrir</a>
-                <form method="post" action="{{ url_for('audio_ochirish', idx=loop.index0) }}" onsubmit="return confirm(&quot;O'chirilsinmi?&quot;)">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button type="submit" class="btn btn-ochirish">O'chirish</button>
-                </form>
-              </div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <p style="color:white; text-align:center; margin-top:20px">Hozircha audio kitob yo'q.</p>
-    {% endif %}
-
   {% elif sahifa == 'audio_tahrirlash' %}
-    <div class="nav"><a href="{{ url_for('audio_sahifa') }}">🎧 Audio kitoblar</a></div>
+    <div class="nav"><a href="{{ url_for('bosh_sahifa') }}#audio-kitoblar">🎧 Audio kitoblar</a></div>
     <form method="post">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <h2>Audio kitobni tahrirlash</h2>
@@ -1252,7 +1250,8 @@ def bosh_sahifa():
                                    malumot=kitoblar_yuklash(),
                                    foydalanuvchi=user,
                                    sevimlilar=foydalanuvchi_sevimlilari(user["email"]) if user else set(),
-                                   texnikum_rasmlari=texnikum_rasmlari())
+                                   texnikum_rasmlari=texnikum_rasmlari(),
+                                   audiollar=audio_yuklash())
 
 
 @app.route("/qidirish")
@@ -1311,10 +1310,7 @@ def sevimli_belgilash(bolim, idx):
 
 @app.route("/audio")
 def audio_sahifa():
-    user = joriy_foydalanuvchi()
-    return render_template_string(HTML, sahifa="audio",
-                                   audiollar=audio_yuklash(),
-                                   foydalanuvchi=user)
+    return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
 
 
 @app.route("/audio/qoshish", methods=["POST"])
@@ -1328,16 +1324,16 @@ def audio_qoshish():
     google_drive_havola = request.form.get("google_drive_havola", "").strip()
     if not nomi:
         flash("Kitob nomini kiriting", "xato")
-        return redirect(url_for("audio_sahifa"))
+        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
     if not telegram_havola and not google_drive_havola:
         flash("Telegram yoki Google Drive havolasini kiriting", "xato")
-        return redirect(url_for("audio_sahifa"))
+        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
     if telegram_havola and not telegram_havolasi_mi(telegram_havola):
         flash("Telegram havolasi https://t.me/... ko'rinishida bo'lishi kerak", "xato")
-        return redirect(url_for("audio_sahifa"))
+        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
     if google_drive_havola and not google_drive_havolasi_mi(google_drive_havola):
         flash("Google Drive havolasi https://drive.google.com/file/d/ID/... ko'rinishida bo'lishi kerak", "xato")
-        return redirect(url_for("audio_sahifa"))
+        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
     roy = audio_yuklash()
     roy.append({
         "nomi": nomi,
@@ -1348,7 +1344,7 @@ def audio_qoshish():
     })
     audio_saqlash(roy)
     flash("Audio kitob qo'shildi!", "muvaffaqiyat")
-    return redirect(url_for("audio_sahifa"))
+    return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
 
 
 @app.route("/audio/tahrirlash/<int:idx>", methods=["GET", "POST"])
@@ -1359,10 +1355,10 @@ def audio_tahrirlash(idx):
     roy = audio_yuklash()
     if idx < 0 or idx >= len(roy):
         flash("Audio kitob topilmadi", "xato")
-        return redirect(url_for("audio_sahifa"))
+        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
     if not admin_mi() and roy[idx].get("tomonidan") != user["email"]:
         flash("Faqat o'zingiz qo'shgan audio kitobni tahrirlashingiz mumkin", "xato")
-        return redirect(url_for("audio_sahifa"))
+        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
     if request.method == "POST":
         nomi = request.form.get("nomi", "").strip()
         muallif = request.form.get("muallif", "").strip()
@@ -1386,7 +1382,7 @@ def audio_tahrirlash(idx):
         roy[idx]["google_drive_havola"] = google_drive_havola
         audio_saqlash(roy)
         flash("Audio kitob saqlandi", "muvaffaqiyat")
-        return redirect(url_for("audio_sahifa"))
+        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
     return render_template_string(HTML, sahifa="audio_tahrirlash",
                                    kitob=roy[idx],
                                    foydalanuvchi=user)
@@ -1400,14 +1396,14 @@ def audio_ochirish(idx):
     roy = audio_yuklash()
     if idx < 0 or idx >= len(roy):
         flash("Audio kitob topilmadi", "xato")
-        return redirect(url_for("audio_sahifa"))
+        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
     if not admin_mi() and roy[idx].get("tomonidan") != user["email"]:
         flash("Faqat o'zingiz qo'shgan audio kitobni o'chirishingiz mumkin", "xato")
-        return redirect(url_for("audio_sahifa"))
+        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
     roy.pop(idx)
     audio_saqlash(roy)
     flash("Audio kitob o'chirildi", "muvaffaqiyat")
-    return redirect(url_for("audio_sahifa"))
+    return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
 
 
 @app.route("/royxat", methods=["GET", "POST"])
