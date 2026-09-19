@@ -278,6 +278,15 @@ def kitobni_topish(m, bolim, idx):
     return m[bolim][idx]
 
 
+def kitobni_id_bilan_topish(m, kitob_id):
+  """Kitobni bo'limdagi o'zgaruvchan indeks o'rniga barqaror ID orqali topadi."""
+  for bolim, kitoblar in m.items():
+    for idx, kitob in enumerate(kitoblar):
+      if str(kitob.get("id", "")) == str(kitob_id):
+        return bolim, idx, kitob
+  return None
+
+
 def fayllarni_tozalash(ochirilgan_kitob, qolgan_m):
     """O'chirilgan kitobning fayl/muqovasini, agar boshqa hech qaysi kitob
     ishlatmasa, diskdan ham o'chiradi (bo'sh joyni tejash uchun)."""
@@ -435,6 +444,14 @@ HTML = """
   .btn-chiqish { display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #e63950, #b8283d); color: #fff !important; padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 14px; box-shadow: 0 3px 8px rgba(184, 40, 61, 0.5); transition: transform 0.15s, box-shadow 0.15s, background 0.15s; }
   .btn-chiqish:hover { background: linear-gradient(135deg, #ff4d64, #d32f45); transform: translateY(-2px) scale(1.05); box-shadow: 0 5px 14px rgba(184, 40, 61, 0.7); }
   .btn-chiqish:active { transform: translateY(0) scale(0.96); box-shadow: 0 2px 6px rgba(184, 40, 61, 0.5); }
+  .btn-kirish, .btn-royxat { display: inline-flex; align-items: center; justify-content: center; padding: 8px 20px; border-radius: 22px; font-weight: bold; font-size: 14px; text-decoration: none; color: #fff !important; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s, background 0.2s, border-color 0.2s, color 0.2s; }
+  .btn-kirish { background: rgba(255,255,255,0.12); border: 2px solid rgba(255,255,255,0.85); box-shadow: 0 3px 8px rgba(0,0,0,0.25); }
+  .btn-kirish:hover { background: #fff; color: #1a3a6e !important; border-color: #fff; transform: translateY(-2px); box-shadow: 0 6px 16px rgba(255,255,255,0.45); }
+  .btn-kirish:active { transform: translateY(1px) scale(0.97); box-shadow: 0 2px 5px rgba(0,0,0,0.35); }
+  .btn-royxat { background: linear-gradient(135deg, #28a745, #1e7e34); border: 2px solid #1e7e34; box-shadow: 0 3px 10px rgba(40,167,69,0.5); }
+  .btn-royxat:hover { background: linear-gradient(135deg, #32d15b, #28a745); border-color: #32d15b; transform: translateY(-2px); box-shadow: 0 7px 18px rgba(40,167,69,0.7); }
+  .btn-royxat:active { transform: translateY(1px) scale(0.97); box-shadow: 0 2px 6px rgba(40,167,69,0.5); }
+  .btn-kirish:focus-visible, .btn-royxat:focus-visible { outline: 3px solid #ffd400; outline-offset: 2px; }
   .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
   .nav { background: #fff; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: center; position: sticky; top: 10px; z-index: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
   .nav a { color: #1a3a6e; margin: 0 12px; text-decoration: none; font-weight: bold; }
@@ -445,7 +462,10 @@ HTML = """
   .auth-form { background: #fff; padding: 30px; border-radius: 10px; max-width: 450px; margin: 30px auto; }
   .auth-form h2 { text-align: center; color: #1a3a6e; margin-top: 0; }
   .auth-form input, .auth-form select { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; }
-  .auth-form button { width: 100%; background: #1a3a6e; color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }
+  .auth-form button { width: 100%; background: linear-gradient(135deg, #1a3a6e, #2c5aa0); color: white; padding: 12px; border: 2px solid #14294d; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: transform 0.15s, box-shadow 0.2s, background 0.2s, border-color 0.2s; box-shadow: 0 3px 10px rgba(26,58,110,0.35); }
+  .auth-form button:hover { background: linear-gradient(135deg, #24508f, #3b74c9); border-color: #24508f; transform: translateY(-2px); box-shadow: 0 7px 18px rgba(26,58,110,0.55); }
+  .auth-form button:active { transform: translateY(1px) scale(0.98); box-shadow: 0 2px 6px rgba(26,58,110,0.45); }
+  .auth-form button:focus-visible { outline: 3px solid #ffd400; outline-offset: 2px; }
   .auth-link { text-align: center; margin-top: 15px; }
   .auth-link a { color: #1a3a6e; }
   .bolim-sarlavha { color: white; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 10px; margin: 20px 0 10px; scroll-margin-top: 80px; }
@@ -477,7 +497,10 @@ HTML = """
   .btn-ochirish { background: #dc3545; }
   form { background: #fff; padding: 20px; border-radius: 10px; margin: 20px 0; }
   form input, form select { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 6px; }
-  form button { background: #1a3a6e; color: white; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; }
+  form button { background: linear-gradient(135deg, #1a3a6e, #2c5aa0); color: white; padding: 10px 20px; border: 2px solid #14294d; border-radius: 8px; cursor: pointer; font-weight: bold; transition: transform 0.15s, box-shadow 0.2s, background 0.2s, border-color 0.2s; }
+  form button:not(.btn):hover { background: linear-gradient(135deg, #24508f, #3b74c9); border-color: #24508f; transform: translateY(-2px); box-shadow: 0 6px 16px rgba(26,58,110,0.5); }
+  form button:not(.btn):active { transform: translateY(1px) scale(0.98); box-shadow: 0 2px 6px rgba(26,58,110,0.45); }
+  form button:focus-visible { outline: 3px solid #ffd400; outline-offset: 2px; }
   .qidiruv-form { display: flex; gap: 10px; }
   .qidiruv-form input { flex: 1; }
   .reader { background: #fff; padding: 20px; border-radius: 10px; text-align: center; }
@@ -567,9 +590,61 @@ HTML = """
     .container, .header-inner { max-width: 1500px; }
     .karusel-slide img { height: 500px; }
   }
+
+  /* ===== Aksessbiliti: ko'zi ojiz va zaif ko'ruvchilar uchun ===== */
+  :focus-visible { outline: 3px solid #ffd400 !important; outline-offset: 2px; }
+  body.fokus-kuchli :focus { outline: 4px solid #ffd400 !important; outline-offset: 2px; background-color: rgba(255,212,0,0.18) !important; }
+  .ekran-oquvchi { position: absolute !important; left: -9999px !important; width: 1px !important; height: 1px !important; overflow: hidden !important; }
+  #aky-btn { position: fixed; right: 16px; bottom: 90px; z-index: 3000; width: 58px; height: 58px; border-radius: 50%; border: 3px solid #fff; background: #ffd400; color: #111; font-size: 28px; line-height: 1; cursor: pointer; box-shadow: 0 5px 18px rgba(0,0,0,0.45); }
+  #aky-btn:hover { transform: scale(1.06); }
+  #aky-panel { position: fixed; right: 16px; bottom: 158px; z-index: 3000; width: 280px; max-width: 92vw; background: #fff; color: #16181d; border-radius: 14px; box-shadow: 0 10px 34px rgba(0,0,0,0.5); padding: 14px; display: none; }
+  #aky-panel.ochiq { display: block; }
+  #aky-panel h3 { margin: 0 0 10px; font-size: 16px; color: #1a3a6e; }
+  #aky-panel button { display: block; width: 100%; margin: 5px 0; padding: 11px 12px; border: 1px solid #ccd4e0; border-radius: 9px; background: #f3f6fb; color: #16181d; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left; }
+  #aky-panel button:hover { background: #e6ecf6; }
+  #aky-panel button.faol { background: #1a3a6e; color: #fff; border-color: #1a3a6e; }
+  #diktor-holat { position: fixed; left: 16px; bottom: 90px; z-index: 3000; background: rgba(0,0,0,0.85); color: #fff; padding: 9px 16px; border-radius: 22px; font-size: 13px; font-weight: bold; display: none; }
+  #diktor-holat.ochiq { display: block; }
+  #aky-yordam { margin: 8px 0 0; font-size: 11px; color: #5b6472; line-height: 1.4; }
+
+  /* Tungi rejim */
+  body.tungi { background: linear-gradient(135deg, #060b16, #0d1626); }
+  body.tungi .header { background: rgba(0,0,0,0.5); }
+  body.tungi .container { color: #e7edf7; }
+  body.tungi .nav { background: #14203a; }
+  body.tungi .nav a { color: #a8c6ff; }
+  body.tungi .bolim-sarlavha { background: rgba(255,255,255,0.09); color: #e7edf7; }
+  body.tungi .karta, body.tungi .reader, body.tungi .auth-form, body.tungi form { background: #14203a; color: #e7edf7; }
+  body.tungi .karta-tana h3 { color: #a8c6ff; }
+  body.tungi .karta-tana p, body.tungi .karta-tana small { color: #b9c6d8; }
+  body.tungi .reader h2, body.tungi .auth-form h2, body.tungi form h2 { color: #a8c6ff; }
+  body.tungi form input, body.tungi form select { background: #0c1730; color: #e7edf7; border-color: #2c3d63; }
+  body.tungi .auth-form { border: 1px solid #24344f; }
+  body.tungi .btn-tahrirlash { color: #16181d; }
+  body.tungi .qidiruv-form input { background: #0c1730; color: #e7edf7; }
+  body.tungi #aky-panel { background: #14203a; color: #e7edf7; }
+  body.tungi #aky-panel button { background: #0c1730; color: #e7edf7; border-color: #2c3d63; }
+  body.tungi #aky-panel button.faol { background: #2c5aa0; color: #fff; }
+  body.tungi #aky-panel h3 { color: #a8c6ff; }
+  body.tungi #aky-yordam { color: #9aa7bb; }
 </style>
 </head>
-<body>
+<body data-sahifa="{{ sahifa }}">
+<a class="ekran-oquvchi" href="#asosiy-mazmun">Asosiy mazmunga o'tish</a>
+<button id="aky-btn" type="button" onclick="akyPanelAlmashtir()" aria-label="Qulaylik sozlamalarini ochish" aria-expanded="false" title="Qulaylik sozlamalari">&#9855;</button>
+<div id="aky-panel" role="dialog" aria-modal="false" aria-label="Qulaylik sozlamalari">
+  <h3>Qulaylik sozlamalari</h3>
+  <button type="button" id="aky-tun" onclick="tunAlmashtir()" aria-pressed="false">Tungi rejim</button>
+  <button type="button" onclick="akyShrift(1)" aria-label="Shriftni kattalashtirish">A+ Shriftni kattalashtirish</button>
+  <button type="button" onclick="akyShrift(-1)" aria-label="Shriftni kichiklashtirish">A- Shriftni kichiklashtirish</button>
+  <button type="button" id="aky-diktor" onclick="diktorAlmashtir()" aria-pressed="false">Diktor (ovozli yo'naltirish)</button>
+  <button type="button" onclick="akySahifaAyt()" aria-label="Joriy sahifani ovozda aytish">Sahifani ovozda aytish</button>
+  <button type="button" id="aky-fokus" onclick="akyFokus()" aria-pressed="false">Kuchli fokus (kontrast)</button>
+  <button type="button" onclick="akyTiklash()" aria-label="Boshlang'ich holatga qaytarish">Boshlang'ich holatga qaytarish</button>
+  <p id="aky-yordam">Diktor yoqilganda sahifadagi tugma va maydonlar ovozda aytib turiladi. PDF sahifasida "Ovozli o'qish" tugmasi kitobni o'qib beradi.</p>
+</div>
+<div id="diktor-holat" role="status" aria-live="polite">Diktor yoqilgan</div>
+<div id="aky-announce" class="ekran-oquvchi" role="status" aria-live="assertive"></div>
 <div class="header">
   <div class="header-inner">
     <h1>Xorazm Pedagogika Texnikumi — Kutubxona</h1>
@@ -578,13 +653,13 @@ HTML = """
         <span>Salom, <b>{{ foydalanuvchi.ism }}</b>!</span>
         <a class="btn-chiqish" href="{{ url_for('chiqish') }}">⏻ Chiqish</a>
       {% else %}
-        <a href="{{ url_for('kirish') }}">Kirish</a>
-        <a href="{{ url_for('royxat') }}">Ro'yxatdan o'tish</a>
+        <a class="btn-kirish" href="{{ url_for('kirish') }}">Kirish</a>
+        <a class="btn-royxat" href="{{ url_for('royxat') }}">Ro'yxatdan o'tish</a>
       {% endif %}
     </div>
   </div>
 </div>
-<div class="container">
+<div class="container" id="asosiy-mazmun" tabindex="-1">
 
   {% with xabarlar = get_flashed_messages(with_categories=true) %}
     {% for tur, xabar in xabarlar %}
@@ -642,7 +717,7 @@ HTML = """
              {% if oqish_url %}</a>{% endif %}
              {% if foydalanuvchi %}
                <a class="yulduzcha {{ 'faol' if kitob.id in sevimlilar else '' }}" href="#"
-                  data-url="{{ url_for('sevimli_belgilash', bolim=bolim, idx=loop.index0) }}"
+                  data-url="{{ url_for('sevimli_belgilash_id', kitob_id=kitob.id) }}"
                   onclick="return sevimliBosildi(this, event)"
                   title="Sevimlilarga qo'shish/olib tashlash">{{ '★' if kitob.id in sevimlilar else '☆' }}</a>
              {% endif %}
@@ -667,7 +742,7 @@ HTML = """
               {% if foydalanuvchi and (kitob.tomonidan == foydalanuvchi.email or foydalanuvchi.rol == 'admin') %}
                 <div class="tugma-qator">
                 <a class="btn btn-tahrirlash" href="{{ url_for('tahrirlash', bolim=bolim, idx=loop.index0) }}">Tahrir</a>
-                <form method="post" action="{{ url_for('ochirish', bolim=bolim, idx=loop.index0) }}" onsubmit="return confirm(&quot;O'chirilsinmi?&quot;)">
+                <form method="post" action="{{ url_for('ochirish_id', kitob_id=kitob.id) }}" onsubmit="return confirm(&quot;O'chirilsinmi?&quot;)">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-ochirish">O'chirish</button>
                 </form>
@@ -738,7 +813,7 @@ HTML = """
   {% elif sahifa == 'qidirish' %}
     <div class="nav"><a href="{{ url_for('bosh_sahifa') }}">Bosh sahifa</a></div>
     <form class="qidiruv-form" method="get">
-      <input type="text" name="so_rov" placeholder="Kitob yoki muallif izlash..." value="{{ so_rov or '' }}">
+      <input type="text" name="so_rov" placeholder="Kitob yoki muallif izlash..." value="{{ so_rov or '' }}" aria-label="Kitob yoki muallif izlash">
       <button type="submit">Qidirish</button>
     </form>
     {% if natija %}
@@ -757,7 +832,7 @@ HTML = """
           {% if oqish_url %}</a>{% endif %}
           {% if foydalanuvchi %}
             <a class="yulduzcha {{ 'faol' if item.kitob.id in sevimlilar else '' }}" href="#"
-               data-url="{{ url_for('sevimli_belgilash', bolim=item.bolim, idx=item.idx) }}"
+               data-url="{{ url_for('sevimli_belgilash_id', kitob_id=item.kitob.id) }}"
                onclick="return sevimliBosildi(this, event)"
                title="Sevimlilarga qo'shish/olib tashlash">{{ '★' if item.kitob.id in sevimlilar else '☆' }}</a>
           {% endif %}
@@ -806,7 +881,7 @@ HTML = """
           {% endif %}
           {% if oqish_url %}</a>{% endif %}
           <a class="yulduzcha faol" href="#"
-             data-url="{{ url_for('sevimli_belgilash', bolim=item.bolim, idx=item.idx) }}"
+             data-url="{{ url_for('sevimli_belgilash_id', kitob_id=item.kitob.id) }}"
              onclick="return sevimliBosildi(this, event)"
              title="Sevimlilardan olib tashlash">★</a>
         </div>
@@ -920,8 +995,9 @@ HTML = """
         <input type="range" id="zoom-slider" min="50" max="200" value="100" step="10" style="width:120px" oninput="setZoom(this.value)">
         <button onclick="zoomIn()" class="pdf-btn">+</button>
         <span id="zoom-val" style="min-width:45px">100%</span>
-        <input type="text" id="search-text" placeholder="Matn izlash..." style="padding:6px; border:1px solid #ddd; border-radius:4px; width:160px">
+        <input type="text" id="search-text" placeholder="Matn izlash..." style="padding:6px; border:1px solid #ddd; border-radius:4px; width:160px" aria-label="PDF ichidan matn izlash">
         <button onclick="searchPDF()" class="pdf-btn">🔍 Izlash</button>
+        <button onclick="pdfOqi()" class="pdf-btn" id="pdf-oqi-btn" aria-label="PDF kitobni ovozli o'qish">🔊 Ovozli o'qish</button>
         <span id="search-status" style="font-size:12px; color:#666"></span>
         <a class="pdf-btn btn-yuklab" href="{{ url_for('static', filename='files/' + kitob.fayl) }}" download style="background:#28a745; text-decoration:none">⬇ Yuklab</a>
       </div>
@@ -1049,6 +1125,63 @@ HTML = """
       document.getElementById('pdf-loading').textContent = 'Xato: ' + err.message;
     });
 
+    let pdfOqilmoqda = false, pdfOvoz = null;
+
+    function pdfTugmaYangila() {
+      const b = document.getElementById('pdf-oqi-btn');
+      if (b) b.textContent = pdfOqilmoqda ? '⏹ O\'qishni to\'xtatish' : '🔊 Ovozli o\'qish';
+    }
+
+    function pdfOvozTanla() {
+      if (!('speechSynthesis' in window)) return;
+      const ovozlar = speechSynthesis.getVoices();
+      pdfOvoz = ovozlar.find(v => (v.lang || '').toLowerCase().startsWith('uz')) ||
+                ovozlar.find(v => (v.lang || '').toLowerCase().startsWith('tr')) ||
+                ovozlar.find(v => (v.lang || '').toLowerCase().startsWith('ru')) ||
+                ovozlar[0] || null;
+    }
+    if ('speechSynthesis' in window) {
+      pdfOvozTanla();
+      speechSynthesis.onvoiceschanged = pdfOvozTanla;
+    }
+
+    function pdfOqi() {
+      if (!('speechSynthesis' in window)) {
+        alert('Bu brauzerda ovozli o\'qish qo\'llab-quvvatlanmaydi.');
+        return;
+      }
+      if (pdfOqilmoqda) {
+        pdfOqilmoqda = false;
+        speechSynthesis.cancel();
+        pdfTugmaYangila();
+        return;
+      }
+      if (!pdfDoc) return;
+      pdfOqilmoqda = true;
+      pdfTugmaYangila();
+      pdfOqiSahifa(pageNum);
+    }
+
+    function pdfOqiSahifa(n) {
+      if (!pdfOqilmoqda) return;
+      if (n > pdfDoc.numPages) {
+        pdfOqilmoqda = false;
+        pdfTugmaYangila();
+        return;
+      }
+      if (n !== pageNum) { pageNum = n; queueRenderPage(pageNum); }
+      pdfDoc.getPage(n).then(p => p.getTextContent()).then(tc => {
+        const matn = tc.items.map(it => it.str).join(' ').replace(/\\s+/g, ' ').trim();
+        if (!matn) { pdfOqiSahifa(n + 1); return; }
+        const u = new SpeechSynthesisUtterance(matn);
+        u.lang = 'uz-UZ';
+        if (pdfOvoz) u.voice = pdfOvoz;
+        u.rate = 0.95;
+        u.onend = () => { if (pdfOqilmoqda) pdfOqiSahifa(n + 1); };
+        speechSynthesis.speak(u);
+      }).catch(() => { if (pdfOqilmoqda) pdfOqiSahifa(n + 1); });
+    }
+
     document.addEventListener('keydown', function(e) {
       const maydonda = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
       if (maydonda) return;
@@ -1088,8 +1221,14 @@ HTML = """
 
       <div id="drive-controls" style="display:flex; align-items:center; justify-content:space-between; align-content:center; position:fixed; bottom:0; left:0; right:0; z-index:1000; padding:14px 20px; background:linear-gradient(135deg, #1a3a6e, #2c5aa0); box-shadow:0 -4px 12px rgba(0,0,0,0.3); color:white">
         <button onclick="qaytish()" class="btn-chiqish-pastki">⬅ Chiqish</button>
+        <button onclick="gapir('Kitob nomi: {{ kitob.nomi|e }}. Muallif: {{ kitob.muallif|e }}.')" class="btn-yuklab-ochish" aria-label="Kitob nomi va muallifini ovozda eshitish">🔊 Ovozda eshitish</button>
         <a href="{{ drive_download }}" target="_blank" rel="noopener" class="btn-yuklab-ochish">⬇ Yuklab olish</a>
       </div>
+
+      <p style="background:#fff3cd; color:#856404; padding:10px 14px; border-radius:8px; margin:10px 0; font-size:14px">
+        Ovozli o'qish Google Drive kitoblari uchun brauzer xavfsizligi sababli cheklangan. To'liq ovozli o'qish uchun
+        PDF faylni <b>kutubxonaga yuklab</b> qo'ying — shunda kitob to'liq ovozda o'qib beriladi.
+      </p>
 
       <div id="pdf-canvas-wrap" style="position:relative; background:#555; padding:10px; border-radius:8px; margin-bottom:70px">
         <iframe src="{{ drive_preview }}" style="width:100%; height:600px; border:none; border-radius:8px" allow="autoplay; encrypted-media" allowfullscreen></iframe>
@@ -1112,8 +1251,8 @@ HTML = """
     <form class="auth-form" method="post">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <h2>Tizimga kirish</h2>
-      <input type="email" name="email" placeholder="Email" required>
-      <input type="password" name="parol" placeholder="Parol" required>
+      <input type="email" name="email" placeholder="Email" required aria-label="Email manzil">
+      <input type="password" name="parol" placeholder="Parol" required aria-label="Parol">
       <button type="submit">Kirish</button>
       <div class="auth-link">Akkaunt yo'qmi? <a href="{{ url_for('royxat') }}">Ro'yxatdan o'tish</a></div>
     </form>
@@ -1122,11 +1261,11 @@ HTML = """
     <form class="auth-form" method="post">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <h2>Ro'yxatdan o'tish</h2>
-      <input type="text" name="ism" placeholder="Ism" required>
-      <input type="text" name="familiya" placeholder="Familiya" required>
-      <input type="email" name="email" placeholder="Email" required>
-      <input type="tel" name="tel" placeholder="+998 (90) 123-45-67" required title="Format: +998 (xx) xxx-xx-xx">
-      <input type="password" name="parol" placeholder="Parol (kamida 6 ta)" minlength="6" required>
+      <input type="text" name="ism" placeholder="Ism" required aria-label="Ism">
+      <input type="text" name="familiya" placeholder="Familiya" required aria-label="Familiya">
+      <input type="email" name="email" placeholder="Email" required aria-label="Email manzil">
+      <input type="tel" name="tel" placeholder="+998 (90) 123-45-67" required title="Format: +998 (xx) xxx-xx-xx" aria-label="Telefon raqam">
+      <input type="password" name="parol" placeholder="Parol (kamida 6 ta)" minlength="6" required aria-label="Parol">
       <button type="submit">Ro'yxatdan o'tish</button>
       <div class="auth-link">Akkauntingiz bormi? <a href="{{ url_for('kirish') }}">Kirish</a></div>
     </form>
@@ -1238,6 +1377,150 @@ function sevimliBosildi(el, event) {
   return false;
 }
 </script>
+
+<script>
+/* ===== Aksessbiliti: tungi rejim, shrift, diktor ===== */
+const AKY_KEY = 'kutubxona_aky';
+let akyHolat = { tun: false, shrift: 0, diktor: false, fokus: false };
+
+function akyOqish() {
+  try { Object.assign(akyHolat, JSON.parse(localStorage.getItem(AKY_KEY) || '{}')); } catch (e) {}
+}
+function akyYozish() {
+  try { localStorage.setItem(AKY_KEY, JSON.stringify(akyHolat)); } catch (e) {}
+}
+function akyQollash() {
+  document.body.classList.toggle('tungi', akyHolat.tun);
+  document.body.classList.toggle('fokus-kuchli', akyHolat.fokus);
+  document.body.style.zoom = akyHolat.shrift === 0 ? '' : (1 + akyHolat.shrift * 0.1).toFixed(2);
+  const tun = document.getElementById('aky-tun');
+  if (tun) { tun.classList.toggle('faol', akyHolat.tun); tun.setAttribute('aria-pressed', akyHolat.tun); tun.textContent = akyHolat.tun ? '☀️ Kunduzgi rejim' : '🌙 Tungi rejim'; }
+  const dik = document.getElementById('aky-diktor');
+  if (dik) { dik.classList.toggle('faol', akyHolat.diktor); dik.setAttribute('aria-pressed', akyHolat.diktor); }
+  const fok = document.getElementById('aky-fokus');
+  if (fok) { fok.classList.toggle('faol', akyHolat.fokus); fok.setAttribute('aria-pressed', akyHolat.fokus); }
+  const hol = document.getElementById('diktor-holat');
+  if (hol) hol.classList.toggle('ochiq', akyHolat.diktor);
+}
+function akyPanelAlmashtir() {
+  const p = document.getElementById('aky-panel');
+  const b = document.getElementById('aky-btn');
+  const och = p.classList.toggle('ochiq');
+  b.setAttribute('aria-expanded', och);
+  if (och && akyHolat.diktor) gapir('Qulaylik sozlamalari ochildi.');
+}
+function tunAlmashtir() { akyHolat.tun = !akyHolat.tun; akyYozish(); akyQollash(); if (akyHolat.diktor) gapir(akyHolat.tun ? 'Tungi rejim yoqildi.' : 'Kunduzgi rejim yoqildi.'); }
+function akyShrift(yon) { akyHolat.shrift = Math.max(-3, Math.min(5, akyHolat.shrift + yon)); akyYozish(); akyQollash(); if (akyHolat.diktor) gapir(akyHolat.shrift > 0 ? 'Shrift kattalashtirildi.' : (akyHolat.shrift < 0 ? 'Shrift kichiklashtirildi.' : 'Shrift oddiy holatda.')); }
+function akyFokus() { akyHolat.fokus = !akyHolat.fokus; akyYozish(); akyQollash(); if (akyHolat.diktor) gapir(akyHolat.fokus ? 'Kuchli fokus yoqildi.' : 'Kuchli fokus ochirildi.'); }
+function akyTiklash() { akyHolat = { tun: false, shrift: 0, diktor: false, fokus: false }; akyYozish(); akyQollash(); if ('speechSynthesis' in window) speechSynthesis.cancel(); gapir('Sozlamalar boshlangich holatga qaytarildi.'); }
+
+/* --- Diktor (ovozli yo'naltirish) --- */
+let diktorOvoz = null;
+function diktorOvozTanla() {
+  if (!('speechSynthesis' in window)) return;
+  const ovozlar = speechSynthesis.getVoices();
+  diktorOvoz = ovozlar.find(v => (v.lang || '').toLowerCase().startsWith('uz')) ||
+               ovozlar.find(v => (v.lang || '').toLowerCase().startsWith('tr')) ||
+               ovozlar.find(v => (v.lang || '').toLowerCase().startsWith('ru')) ||
+               ovozlar[0] || null;
+}
+if ('speechSynthesis' in window) {
+  diktorOvozTanla();
+  speechSynthesis.onvoiceschanged = diktorOvozTanla;
+}
+function gapir(matn) {
+  if (!('speechSynthesis' in window) || !matn) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(matn);
+  u.lang = 'uz-UZ';
+  if (diktorOvoz) u.voice = diktorOvoz;
+  u.rate = 0.95; u.pitch = 1;
+  speechSynthesis.speak(u);
+  const ann = document.getElementById('aky-announce');
+  if (ann) ann.textContent = matn;
+}
+function elementTavsifi(el) {
+  if (!el || !el.tagName) return '';
+  const teg = el.tagName.toLowerCase();
+  let matn = (el.getAttribute('aria-label') || el.getAttribute('title') || '');
+  if (!matn) {
+    if (teg === 'input' || teg === 'select' || teg === 'textarea') matn = el.getAttribute('placeholder') || el.value || el.name || '';
+    else matn = (el.textContent || '').trim();
+  }
+  matn = matn.replace(/\\s+/g, ' ').trim();
+  if (!matn) return '';
+  let tur = '';
+  if (teg === 'a') tur = 'havola';
+  else if (teg === 'button') tur = 'tugma';
+  else if (teg === 'input') tur = el.type === 'password' ? 'parol maydoni' : 'kiritish maydoni';
+  else if (teg === 'select') tur = 'tanlash maydoni';
+  else if (teg === 'textarea') tur = 'matn maydoni';
+  return tur ? tur + ': ' + matn : matn;
+}
+document.addEventListener('focusin', function(e) {
+  if (!akyHolat.diktor) return;
+  const teg = ((e.target && e.target.tagName) || '').toLowerCase();
+  if (['input', 'select', 'textarea'].includes(teg)) {
+    const t = elementTavsifi(e.target);
+    if (t) gapir(t);
+  }
+});
+document.addEventListener('click', function(e) {
+  if (!akyHolat.diktor || !e.target || !e.target.closest) return;
+  const el = e.target.closest('a, button');
+  if (!el || el.id === 'aky-btn' || el.id === 'aky-diktor' || el.id === 'pdf-oqi-btn') return;
+  const t = elementTavsifi(el);
+  if (t) gapir(t);
+});
+
+function diktorAlmashtir() {
+  akyHolat.diktor = !akyHolat.diktor;
+  akyYozish();
+  akyQollash();
+  if (akyHolat.diktor) akySahifaAyt();
+  else if ('speechSynthesis' in window) speechSynthesis.cancel();
+}
+
+const SAHIFA_NOMLARI = {
+  bosh: "Bosh sahifa. Kutubxona bo'limlari va kitoblar ro'yxati.",
+  qidirish: "Qidirish sahifasi. Kitob nomi yoki muallifini yozib qidiring.",
+  sevimlilar: "Sevimlilar sahifasi.",
+  kirish: "Tizimga kirish sahifasi.",
+  royxat: "Royxatdan otish sahifasi.",
+  tasdiqlash: "Email tasdiqlash sahifasi.",
+  foydalanuvchilar: "Foydalanuvchilar sahifasi.",
+  foydalanuvchi_tahrirlash: "Foydalanuvchini tahrirlash sahifasi.",
+  qoshish: "Yangi kitob qoshish sahifasi.",
+  tahrirlash: "Kitobni tahrirlash sahifasi.",
+  audio_tahrirlash: "Audio kitobni tahrirlash sahifasi.",
+  ochish: "PDF kitob oqish sahifasi.",
+  ochish_drive: "Google Drive kitob oqish sahifasi."
+};
+function akySahifaAyt() {
+  const sahifa = (document.body && document.body.dataset.sahifa) || '';
+  let matn = SAHIFA_NOMLARI[sahifa] || "Kutubxona sahifasi.";
+  if (sahifa === 'ochish' || sahifa === 'ochish_drive') {
+    const t = document.querySelector('.reader h2');
+    if (t) matn = "Ochilgan kitob: " + t.textContent.replace(/\\s+/g, ' ').trim() +
+      (sahifa === 'ochish' ? ". Kitobni ovozda eshitish uchun pastdagi ovozli oqish tugmasini bosing." : ".");
+  } else if (sahifa === 'bosh') {
+    const s = document.querySelector('.bolim-sarlavha h2');
+    if (s) matn += ' ' + s.textContent.replace(/\\s+/g, ' ').trim();
+  }
+  gapir(matn);
+}
+document.addEventListener('keydown', function(e) {
+  if (e.altKey && (e.key === 'a' || e.key === 'A')) {
+    e.preventDefault();
+    akyPanelAlmashtir();
+  }
+});
+document.addEventListener('DOMContentLoaded', function() {
+  akyOqish();
+  akyQollash();
+  if (akyHolat.diktor) setTimeout(akySahifaAyt, 700);
+});
+</script>
 </body>
 </html>
 """
@@ -1303,6 +1586,28 @@ def sevimli_belgilash(bolim, idx):
         faol = False
     else:
         ro_yxat.append(kid)
+        faol = True
+    foydalanuvchilar_saqlash(f)
+    return jsonify({"faol": faol})
+
+
+@app.route("/sevimli-id/<kitob_id>", methods=["POST"])
+def sevimli_belgilash_id(kitob_id):
+    """AJAX orqali kitobni barqaror ID yordamida sevimlilarga qo'shadi/olib tashlaydi."""
+    user = joriy_foydalanuvchi()
+    if not user:
+        return jsonify({"xato": "Tizimga kirilmagan"}), 401
+    topilma = kitobni_id_bilan_topish(kitoblar_yuklash(), kitob_id)
+    if topilma is None:
+        return jsonify({"xato": "Kitob topilmadi"}), 404
+    _, _, kitob = topilma
+    f = foydalanuvchilar_yuklash()
+    roy_xat = f["sevimlilar"].setdefault(user["email"], [])
+    if kitob["id"] in roy_xat:
+        roy_xat.remove(kitob["id"])
+        faol = False
+    else:
+        roy_xat.append(kitob["id"])
         faol = True
     foydalanuvchilar_saqlash(f)
     return jsonify({"faol": faol})
@@ -1722,6 +2027,28 @@ def ochirish(bolim, idx):
     if kitob is None:
         flash("Kitob topilmadi", "xato")
         return redirect(url_for("bosh_sahifa"))
+    if not admin_mi() and kitob.get("tomonidan") != user["email"]:
+        flash("Faqat o'zingiz yuklagan kitobni o'chirishingiz mumkin", "xato")
+        return redirect(url_for("bosh_sahifa"))
+    m[bolim].pop(idx)
+    kitoblar_saqlash(m)
+    fayllarni_tozalash(kitob, m)
+    yetim_fayllarni_tozalash(m)
+    return redirect(url_for("bosh_sahifa", _anchor=bolim_slug(bolim)))
+
+
+@app.route("/ochirish-id/<kitob_id>", methods=["POST"])
+def ochirish_id(kitob_id):
+    """Kitobni bo'limdagi o'zgaruvchan indeks emas, barqaror ID orqali o'chiradi."""
+    user = joriy_foydalanuvchi()
+    if not user:
+        return redirect(url_for("kirish"))
+    m = kitoblar_yuklash()
+    topilma = kitobni_id_bilan_topish(m, kitob_id)
+    if topilma is None:
+        flash("Kitob topilmadi", "xato")
+        return redirect(url_for("bosh_sahifa"))
+    bolim, idx, kitob = topilma
     if not admin_mi() and kitob.get("tomonidan") != user["email"]:
         flash("Faqat o'zingiz yuklagan kitobni o'chirishingiz mumkin", "xato")
         return redirect(url_for("bosh_sahifa"))
