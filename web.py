@@ -48,8 +48,6 @@ AUDIO_FILE = os.path.join(os.path.dirname(__file__), "audio.json")
 
 BO_LIMLAR = [
     "Umumta'lim fanlar",
-    "Umumkasbiy fanlar",
-    "Maxsus fanlar",
     "Badiiy adabiyotlar",
 ]
 
@@ -178,7 +176,7 @@ def email_yuborish(manzil, kod):
         return False
 
     msg = MIMEText(
-        f"Xorazm Pedagogika Texnikumi Kutubxonasi\n\n"
+        f"Urganch shahar 25-son maktab kutubxonasi\n\n"
         f"Sizning tasdiqlash kodingiz: {kod}\n\n"
         f"Agar bu siz bo'lsangiz, kodni kiriting. Aks holda e'tibor bermang."
     )
@@ -427,7 +425,7 @@ HTML = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<title>Xorazm Pedagogika Texnikumi Kutubxonasi</title>
+<title>Urganch shahar 25-son maktab — Kutubxona</title>
 <style>
   * { box-sizing: border-box; }
   html { scrollbar-width: auto; scrollbar-color: #8da8c7 #dce5ef; }
@@ -627,6 +625,15 @@ HTML = """
   body.tungi #aky-panel button.faol { background: #2c5aa0; color: #fff; }
   body.tungi #aky-panel h3 { color: #a8c6ff; }
   body.tungi #aky-yordam { color: #9aa7bb; }
+  .saralash { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .saralash label { color: #fff; font-weight: bold; font-size: 14px; }
+  .saralash select { padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.4); background: #fff; color: #1a3a6e; font-size: 14px; min-width: 140px; cursor: pointer; }
+  .saralash button { padding: 8px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.2); color: #fff; cursor: pointer; font-size: 13px; font-weight: bold; transition: background 0.2s; }
+  .saralash button:hover { background: rgba(255,255,255,0.35); }
+  body.tungi .saralash { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); }
+  body.tungi .saralash select { background: #0c1730; color: #e7edf7; border-color: #2c3d63; }
+  body.tungi .saralash button { background: rgba(255,255,255,0.12); border-color: #2c3d63; }
+  body.tungi .saralash button:hover { background: rgba(255,255,255,0.22); }
 </style>
 </head>
 <body data-sahifa="{{ sahifa }}">
@@ -647,7 +654,7 @@ HTML = """
 <div id="aky-announce" class="ekran-oquvchi" role="status" aria-live="assertive"></div>
 <div class="header">
   <div class="header-inner">
-    <h1>Xorazm Pedagogika Texnikumi — Kutubxona</h1>
+    <h1>Urganch shahar 25-son maktab — Kutubxona</h1>
     <div class="header-right">
       {% if foydalanuvchi %}
         <span>Salom, <b>{{ foydalanuvchi.ism }}</b>!</span>
@@ -696,6 +703,18 @@ HTML = """
       Texnikum rasmlari yuklanmagan. <code>Kutubxona/static/texnikum/</code> papkasiga rasmlarni qo'ying.
     </div>
     {% endif %}
+
+    <div class="saralash" id="saralash-panel">
+      <label for="sinf-filter">Sinf:</label>
+      <select id="sinf-filter" aria-label="Sinf bo'yicha saralash">
+        <option value="">Barcha sinflar</option>
+      </select>
+      <label for="fan-filter">Fan:</label>
+      <select id="fan-filter" aria-label="Fan bo'yicha saralash">
+        <option value="">Barcha fanlar</option>
+      </select>
+      <button type="button" onclick="saralashTiklash()">Tozalash</button>
+    </div>
 
     {% for bolim in bolimlar %}
       <div class="bolim-sarlavha" id="{{ bolim_slug(bolim) }}">
@@ -1519,6 +1538,57 @@ document.addEventListener('DOMContentLoaded', function() {
   akyOqish();
   akyQollash();
   if (akyHolat.diktor) setTimeout(akySahifaAyt, 700);
+});
+
+function nomiYordamchi(h3) {
+  const txt = (h3.textContent || '').replace(/\\s+/g, ' ').trim();
+  const sinfMatch = txt.match(/^(\\d+)-sinf\\s*/i);
+  const sinf = sinfMatch ? sinfMatch[1] : '';
+  let fan = sinfMatch ? txt.slice(sinfMatch[0].length).trim() : txt;
+  fan = fan.replace(/\\s*\\d+-qism\\s*$/i, '').trim();
+  return { sinf, fan };
+}
+function saralashIshgaTush() {
+  const sinf = document.getElementById('sinf-filter').value;
+  const fan = document.getElementById('fan-filter').value;
+  document.querySelectorAll('.karta').forEach(karta => {
+    const s = karta.dataset.sinf || '';
+    const f = karta.dataset.fan || '';
+    const mos = (!sinf || s === sinf) && (!fan || f === fan);
+    karta.style.display = mos ? '' : 'none';
+  });
+  document.querySelectorAll('.bolim-sarlavha').forEach(sarlavha => {
+    const kitoblar = sarlavha.nextElementSibling;
+    if (!kitoblar || !kitoblar.classList.contains('kitoblar')) {
+      sarlavha.style.display = 'none';
+      return;
+    }
+    const hechQaysi = [...kitoblar.querySelectorAll('.karta')].some(k => k.style.display !== 'none');
+    sarlavha.style.display = hechQaysi ? '' : 'none';
+    kitoblar.style.display = hechQaysi ? '' : 'none';
+  });
+}
+function saralashTiklash() {
+  document.getElementById('sinf-filter').value = '';
+  document.getElementById('fan-filter').value = '';
+  saralashIshgaTush();
+}
+document.addEventListener('DOMContentLoaded', function() {
+  const sinflar = new Set(), fanlar = new Set();
+  document.querySelectorAll('.karta').forEach(karta => {
+    const h3 = karta.querySelector('h3');
+    if (!h3) return;
+    const { sinf, fan } = nomiYordamchi(h3);
+    karta.dataset.sinf = sinf;
+    karta.dataset.fan = fan;
+    if (sinf) sinflar.add(sinf);
+    if (fan) fanlar.add(fan);
+  });
+  const sinfSelect = document.getElementById('sinf-filter');
+  [...sinflar].sort().forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s + '-sinf'; sinfSelect.appendChild(o); });
+  const fanSelect = document.getElementById('fan-filter');
+  [...fanlar].sort().forEach(f => { const o = document.createElement('option'); o.value = f; o.textContent = f; fanSelect.appendChild(o); });
+  [sinfSelect, fanSelect].forEach(el => el.addEventListener('change', saralashIshgaTush));
 });
 </script>
 </body>
