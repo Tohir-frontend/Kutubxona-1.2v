@@ -122,6 +122,59 @@ def kitob_sinf_fani(kitob):
     return {"sinf": f"{topilma.group(1)}-sinf", "fan": fan}
 
 
+def sinf_tartibi(sinf):
+    """Sinf nomini tabiiy tartib kalitiga aylantiradi.
+
+    "1-sinf", "2-sinf", ..., "10-sinf" tartibi raqam bo'yicha; raqam
+    bilan boshlanmagan nomlar oxirida, alifbo bo'yicha turadi."""
+    topilma = re.match(r"\s*(\d+)", sinf or "")
+    if topilma:
+        return (0, int(topilma.group(1)), (sinf or "").lower())
+    return (1, 0, (sinf or "").lower())
+
+
+def fan_tartibi(fan):
+    """Fan nomini alifbo tartibi kalitiga aylantiradi."""
+    return (fan or "").lower()
+
+
+def kitob_tartibi(kitob):
+    """Kitobni sinf, so'ng fan va nom bo'yicha saralash kaliti."""
+    sf = kitob_sinf_fani(kitob)
+    return (sinf_tartibi(sf["sinf"]), fan_tartibi(sf["fan"]), (kitob.get("nomi") or "").lower())
+
+
+def kitoblarni_tartiblash(m):
+    """Har bir bo'limdagi kitoblarni sinf va fan tartibida saralaydi.
+
+    Har bir element {"kitob": ..., "idx": ...} ko'rinishida bo'ladi: `idx`
+    fayldagi haqiqiy indeks bo'lgani uchun tahrirlash/o'chirish havolalari
+    saralashdan qat'i nazar to'g'ri kitobga boradi."""
+    natija = {}
+    for bolim, kitoblar in m.items():
+        natija[bolim] = sorted(
+            ({"kitob": kitob, "idx": idx} for idx, kitob in enumerate(kitoblar)),
+            key=lambda qator: kitob_tartibi(qator["kitob"]),
+        )
+    return natija
+
+
+def fanlar_tartiblash(fanlar):
+    """Fanlar ro'yxatini alifbo tartibida (katta-kichik harfga qarab emas) qaytaradi."""
+    return sorted(fanlar or [], key=fan_tartibi)
+
+
+def sinflar_tartiblash(sinflar):
+    """Sinflar ro'yxatini raqamli tabiiy tartibda qaytaradi."""
+    return sorted(sinflar or [], key=sinf_tartibi)
+
+
+app.jinja_env.globals["sinf_tartibi"] = sinf_tartibi
+app.jinja_env.globals["fan_tartibi"] = fan_tartibi
+app.jinja_env.globals["sinflar_tartiblash"] = sinflar_tartiblash
+app.jinja_env.globals["fanlar_tartiblash"] = fanlar_tartiblash
+
+
 def filtr_royxatlari(m):
     """Kitoblar ichida mavjud sinf va fanlar ro'yxatini (saralangan) qaytaradi."""
     sinflar, fanlar = set(), set()
@@ -132,7 +185,7 @@ def filtr_royxatlari(m):
                 sinflar.add(sf["sinf"])
             if sf["fan"]:
                 fanlar.add(sf["fan"])
-    return sorted(sinflar), sorted(fanlar)
+    return sorted(sinflar, key=sinf_tartibi), sorted(fanlar, key=fan_tartibi)
 
 
 app.jinja_env.globals["filtr_royxatlari"] = filtr_royxatlari
@@ -776,7 +829,7 @@ HTML = """
     </div>
     {% endif %}
 
-    {% set filt_sinf, filt_fan = filtr_royxatlari(malumot) %}
+    {% set filt_sinf, filt_fan = filtr %}
     <div class="saralash" id="saralash-panel">
       <label for="sinf-filter">Sinf:</label>
       <select id="sinf-filter" aria-label="Sinf bo'yicha saralash">
@@ -801,11 +854,12 @@ HTML = """
       </div>
       {% if malumot[bolim] %}
       <div class="kitoblar">
-        {% for kitob in malumot[bolim] %}
+        {% for qator in malumot[bolim] %}
+         {% set kitob = qator.kitob %}
          {% set sf = kitob_sinf_fani(kitob) %}
          <div class="karta" data-sinf="{{ sf.sinf }}" data-fan="{{ sf.fan }}">
            <div class="muqora">
-             {% set oqish_url = kitob_oqish_havolasi(kitob, bolim, loop.index0) %}
+             {% set oqish_url = kitob_oqish_havolasi(kitob, bolim, qator.idx) %}
              {% set tg_bosiq = kitob.telegram_havola %}
              {% if oqish_url %}<a href="{{ oqish_url }}"{% if tg_bosiq %} target="_blank" rel="noopener"{% endif %} class="muqora-link">{% endif %}
              {% if kitob.muqova %}
@@ -839,13 +893,13 @@ HTML = """
                 <a class="btn btn-ochish" href="{{ google_drive_preview_url(kitob.google_drive_havola) }}" target="_blank" rel="noopener">Ko'rish</a>
                 <a class="btn btn-yuklash" href="{{ google_drive_yuklab_url(kitob.google_drive_havola) }}" target="_blank" rel="noopener">Yuklab olish</a>
               {% elif kitob.fayl %}
-                <a class="btn btn-ochish" href="{{ url_for('ochish', bolim=bolim, idx=loop.index0) }}">O'qish</a>
+                <a class="btn btn-ochish" href="{{ url_for('ochish', bolim=bolim, idx=qator.idx) }}">O'qish</a>
                 <a class="btn btn-yuklash" href="{{ url_for('static', filename='files/' + kitob.fayl) }}" download>Yuklab</a>
               {% endif %}
               </div>
               {% if foydalanuvchi and (kitob.tomonidan == foydalanuvchi.email or foydalanuvchi.rol == 'admin') %}
                 <div class="tugma-qator">
-                <a class="btn btn-tahrirlash" href="{{ url_for('tahrirlash', bolim=bolim, idx=loop.index0) }}">Tahrir</a>
+                <a class="btn btn-tahrirlash" href="{{ url_for('tahrirlash', bolim=bolim, idx=qator.idx) }}">Tahrir</a>
                 <form method="post" action="{{ url_for('ochirish_id', kitob_id=kitob.id) }}" onsubmit="return confirm(&quot;O'chirilsinmi?&quot;)">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-ochirish">O'chirish</button>
@@ -978,14 +1032,14 @@ HTML = """
       <label>Sinf:</label>
       <select name="sinf" required>
         <option value="">Sinfni tanlang</option>
-        {% for sinf in sinflar | sort %}
+        {% for sinf in sinflar_tartiblash(sinflar) %}
         <option value="{{ sinf }}">{{ sinf }}</option>
         {% endfor %}
       </select>
       <label>Fan:</label>
       <select name="fan" required>
         <option value="">Fanni tanlang</option>
-        {% for fan in fanlar | sort %}
+        {% for fan in fanlar_tartiblash(fanlar) %}
         <option value="{{ fan }}">{{ fan }}</option>
         {% endfor %}
       </select>
@@ -1017,14 +1071,14 @@ HTML = """
       <label>Sinf:</label>
       <select name="sinf">
         <option value="">Sinfni tanlang</option>
-        {% for sinf in sinflar | sort %}
+        {% for sinf in sinflar_tartiblash(sinflar) %}
         <option value="{{ sinf }}" {{ 'selected' if kitob.get('sinf') == sinf else '' }}>{{ sinf }}</option>
         {% endfor %}
       </select>
       <label>Fan:</label>
       <select name="fan">
         <option value="">Fanni tanlang</option>
-        {% for fan in fanlar | sort %}
+        {% for fan in fanlar_tartiblash(fanlar) %}
         <option value="{{ fan }}" {{ 'selected' if kitob.get('fan') == fan else '' }}>{{ fan }}</option>
         {% endfor %}
       </select>
@@ -1067,9 +1121,9 @@ HTML = """
       <div id="fan-xabar" style="margin-top:10px;color:#155724"></div>
     </div>
     <div class="auth-form">
-      <h2>Sinflar ({{ sinflar | length }})</h2>
+      <h2>Sinflar ({{ sinflar | length }}) — raqam tartibida</h2>
       <ul class="fanlar-royxati">
-        {% for sinf in sinflar | sort %}
+        {% for sinf in sinflar_tartiblash(sinflar) %}
         <li class="fan-qator">
           <span class="fan-nomi">{{ sinf }}</span>
           <span class="qator-amallar">
@@ -1092,9 +1146,9 @@ HTML = """
       </ul>
     </div>
     <div class="auth-form">
-      <h2>Fanlar ({{ fanlar | length }}) — barcha sinflar uchun</h2>
+      <h2>Fanlar ({{ fanlar | length }}) — barcha sinflar uchun, alifbo tartibida</h2>
       <ul class="fanlar-royxati">
-        {% for fan in fanlar | sort %}
+        {% for fan in fanlar_tartiblash(fanlar) %}
         <li class="fan-qator">
           <span class="fan-nomi">{{ fan }}</span>
           <span class="qator-amallar">
@@ -1834,8 +1888,10 @@ document.addEventListener('DOMContentLoaded', function() {
 @app.route("/")
 def bosh_sahifa():
     user = joriy_foydalanuvchi()
+    m = kitoblar_yuklash()
     return render_template_string(HTML, sahifa="bosh", bolimlar=BO_LIMLAR,
-                                   malumot=kitoblar_yuklash(),
+                                   malumot=kitoblarni_tartiblash(m),
+                                   filtr=filtr_royxatlari(m),
                                    foydalanuvchi=user,
                                    sevimlilar=foydalanuvchi_sevimlilari(user["email"]) if user else set(),
                                    texnikum_rasmlari=texnikum_rasmlari())
@@ -1853,6 +1909,7 @@ def qidirish():
                 maydonlar = (kitob.get("nomi", ""), kitob.get("muallif", ""), sf["sinf"], sf["fan"])
                 if any(so_rov in (m or "").lower() for m in maydonlar):
                     natija.append({"bolim": bolim, "idx": idx, "kitob": kitob})
+    natija.sort(key=lambda qator: kitob_tartibi(qator["kitob"]))
     return render_template_string(HTML, sahifa="qidirish", bolimlar=BO_LIMLAR,
                                    so_rov=so_rov, natija=natija, foydalanuvchi=user,
                                    sevimlilar=foydalanuvchi_sevimlilari(user["email"]) if user else set())
@@ -1870,6 +1927,7 @@ def sevimlilar_sahifa():
         for idx, kitob in enumerate(kitoblar):
             if kitob.get("id") in mening:
                 natija.append({"bolim": bolim, "idx": idx, "kitob": kitob})
+    natija.sort(key=lambda qator: kitob_tartibi(qator["kitob"]))
     return render_template_string(HTML, sahifa="sevimlilar", bolimlar=BO_LIMLAR,
                                    natija=natija, foydalanuvchi=user, sevimlilar=mening)
 
