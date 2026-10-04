@@ -9,7 +9,7 @@
 | `requirements.txt` | O'rnatiladigan kutubxonalar (Flask va boshqalar) |
 | `.env` | Gmail, SECRET_KEY, admin login/parol (maxfiy — hech kimga bermang) |
 | `kutubxona.json` | Kitoblar bazasi |
-| `audio.json` | Audio kitoblar bazasi |
+| `fanlar.json` | Sinflar va fanlar ro'yxati |
 | `users.json` | Foydalanuvchilar (bo'lmasa avtomatik yaratiladi) |
 | `static/` | Rasmlar (muqovalar, texnikum suratlari) |
 | `.htaccess` | Maxfiy fayllarni brauzerdan bloklash qoidalari |
@@ -22,7 +22,7 @@ cPanel File Manager → `/home/xonqatex` → **+ Folder** → nomi: `library`
 > `public_html`ni app root qilib bo'lmaydi ("Directory public_html not allowed" xatosi beradi).
 
 ### 2. Zipni `library` ichiga chiqaring
-`library` ichida quyidagilar bo'lishi kerak: `web.py`, `passenger_wsgi.py`, `requirements.txt`, `.env`, `kutubxona.json`, `audio.json`, `users.json`, `static/`.
+`library` ichida quyidagilar bo'lishi kerak: `web.py`, `passenger_wsgi.py`, `requirements.txt`, `.env`, `kutubxona.json`, `fanlar.json`, `users.json`, `static/`.
 
 ### 3. `.env` mazmunini tekshiring
 ```
@@ -60,7 +60,7 @@ Python App sahifasida **Restart** tugmasini bosing → `https://pedagogika-edu.u
 ### 8. Xavfsizlik (docroot)
 `public_html` ichida `.htaccess` bo'lishi kerak (maxfiy fayllar bloklanadi):
 ```apache
-<FilesMatch "^(\.env|users\.json|kutubxona\.json|audio\.json|README\.md)$">
+<FilesMatch "^(\.env|users\.json|kutubxona\.json|fanlar\.json|README\.md)$">
     Require all denied
 </FilesMatch>
 <FilesMatch "\.(py|pyc|zip)$">

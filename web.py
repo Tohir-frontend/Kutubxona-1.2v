@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import json
 import os
 import random
+import re
 import string
 import uuid
 from urllib.parse import urlparse
@@ -31,6 +32,10 @@ app.config["COVER_FOLDER"] = os.path.join(os.path.dirname(__file__), "static", "
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 MAX_RASM_HAJM = int(0.3 * 1024 * 1024)
 
+DATA_FILE = os.path.join(os.path.dirname(__file__), "kutubxona.json")
+USERS_FILE = os.path.join(os.path.dirname(__file__), "users.json")
+FANLAR_FILE = os.path.join(os.path.dirname(__file__), "fanlar.json")
+
 csrf = CSRFProtect(app)
 
 
@@ -41,10 +46,6 @@ def kesh_taqiqlash(response):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
-
-DATA_FILE = os.path.join(os.path.dirname(__file__), "kutubxona.json")
-USERS_FILE = os.path.join(os.path.dirname(__file__), "users.json")
-AUDIO_FILE = os.path.join(os.path.dirname(__file__), "audio.json")
 
 BO_LIMLAR = [
     "Umumta'lim fanlar",
@@ -67,6 +68,75 @@ def foydalanuvchilar_yuklash():
 def foydalanuvchilar_saqlash(f):
     with open(USERS_FILE, "w", encoding="utf-8") as fp:
         json.dump(f, fp, ensure_ascii=False, indent=2)
+
+
+def fanlar_yuklash():
+    """Sinflar va umumiy fanlar ro'yxatini qaytaradi.
+
+    Natija: {"sinflar": [...], "fanlar": [...]}. Fanlar ro'yxati barcha
+    sinflar uchun umumiy. Eski formatdagi fayl ({sinf: [fanlar]}) avtomatik
+    ravishda bitta umumiy ro'yxatga birlashtirilib o'qiladi; keyingi
+    `fanlar_saqlash` chaqirilganda yangi formatda saqlanadi."""
+    malumot = {}
+    if os.path.exists(FANLAR_FILE):
+        with open(FANLAR_FILE, "r", encoding="utf-8") as f:
+            malumot = json.load(f)
+    if isinstance(malumot.get("sinflar"), list) and isinstance(malumot.get("fanlar"), list):
+        return {"sinflar": malumot["sinflar"], "fanlar": malumot["fanlar"]}
+    sinflar, umumiy_fanlar = [], []
+    for sinf, fan_royxati in malumot.items():
+        if not isinstance(fan_royxati, list):
+            continue
+        sinflar.append(sinf)
+        for fan in fan_royxati:
+            if fan and fan not in umumiy_fanlar:
+                umumiy_fanlar.append(fan)
+    return {"sinflar": sinflar, "fanlar": umumiy_fanlar}
+
+
+def fanlar_saqlash(malumot):
+    with open(FANLAR_FILE, "w", encoding="utf-8") as fp:
+        json.dump({"sinflar": malumot["sinflar"], "fanlar": malumot["fanlar"]},
+                  fp, ensure_ascii=False, indent=2)
+
+
+_SINF_QAT = re.compile(r"(\d+)\s*-\s*sinf", re.IGNORECASE)
+_QISM_SARFI = re.compile(r"\s*\d+\s*-\s*qism\s*$", re.IGNORECASE)
+
+
+def kitob_sinf_fani(kitob):
+    """Kitobning sinf va fanini qaytaradi.
+
+    Avval kitobdagi `sinf`/`fan` maydonlaridan oladi. Eski kitoblarda bu
+    maydonlar yo'q, ular uchun nomi matnidan ("10-sinf Fizika 2-qism")
+    sinf va fan ajratib olinadi."""
+    sinf = (kitob.get("sinf") or "").strip()
+    fan = (kitob.get("fan") or "").strip()
+    if sinf or fan:
+        return {"sinf": sinf, "fan": fan}
+    nomi = kitob.get("nomi") or ""
+    topilma = _SINF_QAT.search(nomi)
+    if not topilma:
+        return {"sinf": "", "fan": ""}
+    fan = _QISM_SARFI.sub("", nomi[:topilma.start()] + " " + nomi[topilma.end():]).strip(" -—")
+    return {"sinf": f"{topilma.group(1)}-sinf", "fan": fan}
+
+
+def filtr_royxatlari(m):
+    """Kitoblar ichida mavjud sinf va fanlar ro'yxatini (saralangan) qaytaradi."""
+    sinflar, fanlar = set(), set()
+    for kitoblar in m.values():
+        for kitob in kitoblar:
+            sf = kitob_sinf_fani(kitob)
+            if sf["sinf"]:
+                sinflar.add(sf["sinf"])
+            if sf["fan"]:
+                fanlar.add(sf["fan"])
+    return sorted(sinflar), sorted(fanlar)
+
+
+app.jinja_env.globals["filtr_royxatlari"] = filtr_royxatlari
+app.jinja_env.globals["kitob_sinf_fani"] = kitob_sinf_fani
 
 
 def kitoblar_yuklash():
@@ -97,22 +167,6 @@ def foydalanuvchi_sevimlilari(email):
 def kitoblar_saqlash(m):
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(m, f, ensure_ascii=False, indent=2)
-
-
-def audio_yuklash():
-    """Audio kitoblar ro'yxatini yuklaydi (audio.json)."""
-    if os.path.exists(AUDIO_FILE):
-        try:
-            with open(AUDIO_FILE, "r", encoding="utf-8") as f:
-                return json.load(f).get("audio", [])
-        except (json.JSONDecodeError, OSError):
-            return []
-    return []
-
-
-def audio_saqlash(royxat):
-    with open(AUDIO_FILE, "w", encoding="utf-8") as f:
-        json.dump({"audio": royxat}, f, ensure_ascii=False, indent=2)
 
 
 def fayl_hajmi(fayl_nomi):
@@ -499,6 +553,24 @@ HTML = """
   form button:not(.btn):hover { background: linear-gradient(135deg, #24508f, #3b74c9); border-color: #24508f; transform: translateY(-2px); box-shadow: 0 6px 16px rgba(26,58,110,0.5); }
   form button:not(.btn):active { transform: translateY(1px) scale(0.98); box-shadow: 0 2px 6px rgba(26,58,110,0.45); }
   form button:focus-visible { outline: 3px solid #ffd400; outline-offset: 2px; }
+  /* Sinf va fan nomi kartada katta harfli va qalin */
+  .sinf-fan-nomi { font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+  p.sinf-fan-nomi { margin:0 0 6px; color:#1a3a6e; font-size:13px; }
+  /* Sinflar va fanlar ro'yxati (admin) */
+  .sinf-qator { color:#1a3a6e; margin:14px 0 6px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  .sinf-nomi { font-size:17px; }
+  .fanlar-royxati { list-style:none; padding:0; margin:0; }
+  .fan-qator { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid #eee; flex-wrap:wrap; }
+  .fan-nomi { font-size:15px; }
+  .qator-amallar { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .qator-amallar form { display:flex; align-items:center; gap:6px; margin:0; padding:0; background:none; border-radius:0; }
+  .qator-amallar input[type="text"] { width:150px; margin:0; padding:6px 8px; font-size:13px; }
+  .qator-amallar .btn { width:auto; min-height:28px; padding:5px 12px; font-size:12px; }
+  @media (max-width: 700px) {
+    .qator-amallar { width:100%; }
+    .qator-amallar form { flex:1 1 100%; }
+    .qator-amallar input[type="text"] { flex:1; width:auto; }
+  }
   .qidiruv-form { display: flex; gap: 10px; }
   .qidiruv-form input { flex: 1; }
   .reader { background: #fff; padding: 20px; border-radius: 10px; text-align: center; }
@@ -678,11 +750,11 @@ HTML = """
     <div class="nav">
       <a href="{{ url_for('bosh_sahifa') }}">Bosh sahifa</a>
       <a href="{{ url_for('qidirish') }}">Qidirish</a>
-      <a href="#audio-kitoblar">🎧 Audio kitoblar</a>
       {% if foydalanuvchi %}
         <a href="{{ url_for('qoshish') }}">Kitob qo'shish</a>
         <a href="{{ url_for('sevimlilar_sahifa') }}">★ Sevimlilarim</a>
         {% if foydalanuvchi.rol == 'admin' %}
+          <a href="{{ url_for('fanlar_sahifa') }}">📚 Fanlar va sinflar</a>
           <a href="{{ url_for('foydalanuvchilar_sahifa') }}">👥 Foydalanuvchilar</a>
         {% endif %}
       {% endif %}
@@ -704,14 +776,21 @@ HTML = """
     </div>
     {% endif %}
 
+    {% set filt_sinf, filt_fan = filtr_royxatlari(malumot) %}
     <div class="saralash" id="saralash-panel">
       <label for="sinf-filter">Sinf:</label>
       <select id="sinf-filter" aria-label="Sinf bo'yicha saralash">
         <option value="">Barcha sinflar</option>
+        {% for sinf in filt_sinf %}
+        <option value="{{ sinf }}">{{ sinf }}</option>
+        {% endfor %}
       </select>
       <label for="fan-filter">Fan:</label>
       <select id="fan-filter" aria-label="Fan bo'yicha saralash">
         <option value="">Barcha fanlar</option>
+        {% for fan in filt_fan %}
+        <option value="{{ fan }}">{{ fan }}</option>
+        {% endfor %}
       </select>
       <button type="button" onclick="saralashTiklash()">Tozalash</button>
     </div>
@@ -723,7 +802,8 @@ HTML = """
       {% if malumot[bolim] %}
       <div class="kitoblar">
         {% for kitob in malumot[bolim] %}
-         <div class="karta">
+         {% set sf = kitob_sinf_fani(kitob) %}
+         <div class="karta" data-sinf="{{ sf.sinf }}" data-fan="{{ sf.fan }}">
            <div class="muqora">
              {% set oqish_url = kitob_oqish_havolasi(kitob, bolim, loop.index0) %}
              {% set tg_bosiq = kitob.telegram_havola %}
@@ -741,10 +821,15 @@ HTML = """
                   title="Sevimlilarga qo'shish/olib tashlash">{{ '★' if kitob.id in sevimlilar else '☆' }}</a>
              {% endif %}
            </div>
-          <div class="karta-tana">
-            <h3>{{ kitob.nomi }}</h3>
-            <p class="qator"><span>{{ kitob.muallif }}</span><span>{{ kitob.yili }}</span></p>
-            <p class="qator yuklagan"><span>{% if kitob.telegram_havola %}Telegram kanal{% elif kitob.google_drive_havola %}Google Drive{% elif kitob.fayl %}MB: {{ fayl_hajmi(kitob.fayl) }}{% endif %}</span><span>{{ foydalanuvchi_ismi(kitob.tomonidan) }}</span></p>
+           <div class="karta-tana">
+             <h3>{{ kitob.nomi }}</h3>
+{% if sf.sinf or sf.fan %}
+              <p class="sinf-fan-nomi">
+                {% if sf.sinf %}{{ sf.sinf }}{% endif %}
+                {% if sf.fan %} — {{ sf.fan }}{% endif %}
+              </p>
+              {% endif %}
+             <p class="qator"><span>{{ kitob.muallif }}</span><span>{{ kitob.yili }}</span></p>
             <div class="tugmalar">
               <div class="tugma-qator">
               {% if kitob.telegram_havola %}
@@ -775,70 +860,16 @@ HTML = """
       {% endif %}
     {% endfor %}
 
-    <div class="bolim-sarlavha" id="audio-kitoblar">
-      <h2 style="margin:0">🎧 Audio kitoblar <small>({{ (audiollar or [])|length }} ta)</small></h2>
-    </div>
-    {% if foydalanuvchi %}
-    <form method="post" action="{{ url_for('audio_qoshish') }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <h2>Yangi audio kitob qo'shish</h2>
-      <label>Kitob nomi:</label>
-      <input type="text" name="nomi" required>
-      <label>Muallif (ixtiyoriy):</label>
-      <input type="text" name="muallif">
-      <label>Telegram havolasi (ixtiyoriy):</label>
-      <input type="url" name="telegram_havola" placeholder="https://t.me/kanal/123">
-      <label>Google Drive'dagi audio kitob havolasini kiriting.</label>
-      <input type="url" name="google_drive_havola" placeholder="https://drive.google.com/file/d/ID/view" required>
-      <button type="submit">Saqlash</button>
-    </form>
-    {% endif %}
-    {% if audiollar %}
-    <div class="kitoblar">
-      {% for a in audiollar %}
-      <div class="karta">
-        <div class="karta-tana">
-          <h3>{{ a.nomi }}</h3>
-          <p class="qator"><span>{{ a.muallif or 'Noma\u2019lum muallif' }}</span><span>🎧 Audio</span></p>
-          <p class="qator yuklagan"><span>{% if a.google_drive_havola %}Google Drive{% elif a.telegram_havola %}Telegram kanal{% endif %}</span><span>{{ foydalanuvchi_ismi(a.tomonidan) }}</span></p>
-          <div class="tugmalar">
-            <div class="tugma-qator">
-              {% if a.google_drive_havola %}
-                <a class="btn btn-ochish" href="{{ google_drive_preview_url(a.google_drive_havola) }}" target="_blank" rel="noopener">🎧 Eshitish</a>
-                <a class="btn btn-yuklash" href="{{ google_drive_yuklab_url(a.google_drive_havola) }}" target="_blank" rel="noopener">Yuklab olish</a>
-              {% elif a.telegram_havola %}
-                <a class="btn btn-ochish" href="{{ a.telegram_havola }}" target="_blank" rel="noopener">🎧 Eshitish</a>
-                <a class="btn btn-yuklash" href="{{ a.telegram_havola }}" target="_blank" rel="noopener">Yuklab olish</a>
-              {% endif %}
-            </div>
-            {% if foydalanuvchi and (a.tomonidan == foydalanuvchi.email or foydalanuvchi.rol == 'admin') %}
-              <div class="tugma-qator">
-                <a class="btn btn-tahrirlash" href="{{ url_for('audio_tahrirlash', idx=loop.index0) }}">Tahrir</a>
-                <form method="post" action="{{ url_for('audio_ochirish', idx=loop.index0) }}" onsubmit="return confirm(&quot;O'chirilsinmi?&quot;)">
-                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                  <button type="submit" class="btn btn-ochirish">O'chirish</button>
-                </form>
-              </div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <p style="color:white; text-align:center; margin-top:20px">Hozircha audio kitob yo'q.</p>
-    {% endif %}
-
   {% elif sahifa == 'qidirish' %}
     <div class="nav"><a href="{{ url_for('bosh_sahifa') }}">Bosh sahifa</a></div>
-    <form class="qidiruv-form" method="get">
-      <input type="text" name="so_rov" placeholder="Kitob yoki muallif izlash..." value="{{ so_rov or '' }}" aria-label="Kitob yoki muallif izlash">
-      <button type="submit">Qidirish</button>
+    <form class="qidiruv-form" method="get" id="qidiruv-form">
+      <input type="search" name="so_rov" id="qidiruv-maydon" placeholder="Kitob yoki muallif izlash..." value="{{ so_rov or '' }}" aria-label="Kitob yoki muallif izlash" autocomplete="off">
     </form>
     {% if natija %}
     <div class="kitoblar" style="margin-top:20px">
       {% for item in natija %}
-      <div class="karta">
+      {% set sf = kitob_sinf_fani(item.kitob) %}
+      <div class="karta" data-sinf="{{ sf.sinf }}" data-fan="{{ sf.fan }}">
         <div class="muqora">
           {% set oqish_url = kitob_oqish_havolasi(item.kitob, item.bolim, item.idx) %}
           {% set tg_bosiq = item.kitob.telegram_havola %}
@@ -857,7 +888,7 @@ HTML = """
           {% endif %}
         </div>
         <div class="karta-tana">
-          <small style="color:#1a3a6e">{{ item.bolim }}</small>
+          <small style="color:#1a3a6e">{{ item.bolim }}{% if sf.sinf or sf.fan %} — <span class="sinf-fan-nomi">{{ sf.sinf }}{% if sf.fan %} / {{ sf.fan }}{% endif %}</span>{% endif %}</small>
           <h3>{{ item.kitob.nomi }}</h3>
            <p>{{ item.kitob.muallif }} ({{ item.kitob.yili }})</p>
            <div class="tugmalar">
@@ -880,6 +911,8 @@ HTML = """
      </div>
     {% elif so_rov %}
     <p style="color:white; text-align:center; margin-top:20px">Hech narsa topilmadi.</p>
+    {% else %}
+    <p style="color:white; text-align:center; margin-top:20px">Qidirish uchun yuqoridagi maydonga kitob yoki muallif nomini yozing.</p>
     {% endif %}
 
   {% elif sahifa == 'sevimlilar' %}
@@ -888,7 +921,8 @@ HTML = """
     {% if natija %}
     <div class="kitoblar" style="margin-top:20px">
       {% for item in natija %}
-      <div class="karta" data-olib-tashlansin="1">
+      {% set sf = kitob_sinf_fani(item.kitob) %}
+      <div class="karta" data-olib-tashlansin="1" data-sinf="{{ sf.sinf }}" data-fan="{{ sf.fan }}">
         <div class="muqora">
           {% set oqish_url = kitob_oqish_havolasi(item.kitob, item.bolim, item.idx) %}
           {% set tg_bosiq = item.kitob.telegram_havola %}
@@ -905,7 +939,7 @@ HTML = """
              title="Sevimlilardan olib tashlash">★</a>
         </div>
         <div class="karta-tana">
-          <small style="color:#1a3a6e">{{ item.bolim }}</small>
+          <small style="color:#1a3a6e">{{ item.bolim }}{% if sf.sinf or sf.fan %} — <span class="sinf-fan-nomi">{{ sf.sinf }}{% if sf.fan %} / {{ sf.fan }}{% endif %}</span>{% endif %}</small>
           <h3>{{ item.kitob.nomi }}</h3>
           <p class="qator"><span>{{ item.kitob.muallif }}</span><span>{{ item.kitob.yili }}</span></p>
           <div class="tugmalar">
@@ -930,37 +964,40 @@ HTML = """
     <p style="color:white; text-align:center; margin-top:20px">Sevimlilar ro'yxati bo'sh. Kitoblar ustidagi ☆ belgisini bosib qo'shing.</p>
     {% endif %}
 
-  {% elif sahifa == 'audio_tahrirlash' %}
-    <div class="nav"><a href="{{ url_for('bosh_sahifa') }}#audio-kitoblar">🎧 Audio kitoblar</a></div>
-    <form method="post">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <h2>Audio kitobni tahrirlash</h2>
-      <label>Kitob nomi:</label>
-      <input type="text" name="nomi" value="{{ kitob.nomi }}" required>
-      <label>Muallif (ixtiyoriy):</label>
-      <input type="text" name="muallif" value="{{ kitob.muallif or '' }}">
-      <label>Telegram havolasi (ixtiyoriy):</label>
-      <input type="url" name="telegram_havola" value="{{ kitob.telegram_havola or '' }}" placeholder="https://t.me/kanal/123">
-      <label>Google Drive'dagi audio kitob havolasini kiriting.</label>
-      <input type="url" name="google_drive_havola" value="{{ kitob.google_drive_havola or '' }}" placeholder="https://drive.google.com/file/d/ID/view" required>
-      <button type="submit">Saqlash</button>
-    </form>
-
   {% elif sahifa == 'qoshish' %}
     <div class="nav"><a href="{{ url_for('bosh_sahifa') }}">Bosh sahifa</a></div>
       <form method="post" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <h2>Yangi kitob qo'shish</h2>
       <label>Bo'lim:</label>
-      <select name="bolim">
-        {% for bolim in bolimlar %}<option value="{{ bolim }}">{{ bolim }}</option>{% endfor %}
+      <select name="bolim" required>
+        {% for bolim in bolimlar %}
+        <option value="{{ bolim }}">{{ bolim }}</option>
+        {% endfor %}
       </select>
-      <label>Kitob nomi:</label>
-      <input type="text" name="nomi" required>
-      <label>Muallif:</label>
-      <input type="text" name="muallif" required>
-          <label>Yili:</label>
-          <input type="text" name="yili" required>
+      <label>Sinf:</label>
+      <select name="sinf" required>
+        <option value="">Sinfni tanlang</option>
+        {% for sinf in sinflar | sort %}
+        <option value="{{ sinf }}">{{ sinf }}</option>
+        {% endfor %}
+      </select>
+      <label>Fan:</label>
+      <select name="fan" required>
+        <option value="">Fanni tanlang</option>
+        {% for fan in fanlar | sort %}
+        <option value="{{ fan }}">{{ fan }}</option>
+        {% endfor %}
+      </select>
+      {% if not fanlar %}
+      <small style="color:#721c24">Hali fan qo'shilmagan. Fan va sinf ro'yxatini admin boshqaradi.</small>
+      {% endif %}
+      <label>Kitob nomi (ixtiyoriy):</label>
+      <input type="text" name="nomi">
+      <label>Muallif (ixtiyoriy):</label>
+      <input type="text" name="muallif">
+          <label>Nashr yili (ixtiyoriy):</label>
+          <input type="text" name="yili">
           <label>Muqova rasmi (ixtiyoriy, max 0.3 MB):</label>
           <input type="file" name="muqova" accept="image/*" onchange="if(this.files[0] && this.files[0].size > 0.3*1024*1024){ alert('Rasm hajmi 0.3 MB dan katta! Kichikroq rasm tanlang.'); this.value=''; }">
           <label>Telegram kanalidagi kitob havolasi (ixtiyoriy):</label>
@@ -975,12 +1012,26 @@ HTML = """
     <form method="post" enctype="multipart/form-data">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <h2>Kitobni tahrirlash</h2>
-      <label>Nomi:</label>
-      <input type="text" name="nomi" value="{{ kitob.nomi }}" required>
-      <label>Muallif:</label>
-      <input type="text" name="muallif" value="{{ kitob.muallif }}" required>
-        <label>Yili:</label>
-        <input type="text" name="yili" value="{{ kitob.yili }}" required>
+      <label>Nomi (ixtiyoriy):</label>
+      <input type="text" name="nomi" value="{{ kitob.nomi or '' }}">
+      <label>Sinf:</label>
+      <select name="sinf">
+        <option value="">Sinfni tanlang</option>
+        {% for sinf in sinflar | sort %}
+        <option value="{{ sinf }}" {{ 'selected' if kitob.get('sinf') == sinf else '' }}>{{ sinf }}</option>
+        {% endfor %}
+      </select>
+      <label>Fan:</label>
+      <select name="fan">
+        <option value="">Fanni tanlang</option>
+        {% for fan in fanlar | sort %}
+        <option value="{{ fan }}" {{ 'selected' if kitob.get('fan') == fan else '' }}>{{ fan }}</option>
+        {% endfor %}
+      </select>
+      <label>Muallif (ixtiyoriy):</label>
+      <input type="text" name="muallif" value="{{ kitob.muallif or '' }}">
+        <label>Nashr yili (ixtiyoriy):</label>
+        <input type="text" name="yili" value="{{ kitob.yili or '' }}">
         <label>Muqova rasmi (ixtiyoriy, max 0.3 MB):</label>
         <input type="file" name="muqova" accept="image/*" onchange="if(this.files[0] && this.files[0].size > 0.3*1024*1024){ alert('Rasm hajmi 0.3 MB dan katta! Kichikroq rasm tanlang.'); this.value=''; }">
         {% if kitob.muqova %}<small>Hozirgi rasm: {{ kitob.muqova }} — yangi rasm tanlasangiz almashtiriladi.</small>{% endif %}
@@ -991,6 +1042,81 @@ HTML = """
         <button type="submit">Saqlash</button>
     </form>
 
+  {% elif sahifa == 'fanlar' %}
+    <div class="nav"><a href="{{ url_for('bosh_sahifa') }}">Bosh sahifa</a></div>
+    <h2 style="color:white">Sinflar va fanlar ro'yxati</h2>
+    <div class="auth-form">
+      <h2>Yangi sinf qo'shish</h2>
+      <form id="sinf-qoshish-form" method="post" action="{{ url_for('sinf_qoshish') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>Sinf nomi:</label>
+        <input type="text" name="sinf" required placeholder="Masalan: 9-sinf">
+        <button type="submit">Qo'shish</button>
+      </form>
+      <div id="sinf-xabar" style="margin-top:10px;color:#155724"></div>
+    </div>
+    <div class="auth-form">
+      <h2>Yangi fan qo'shish</h2>
+      <p style="margin:0 0 10px;color:#555;font-size:14px">Fanlar ro'yxati <b>barcha sinflar uchun umumiy</b> — bir marta qo'shsangiz, barcha sinflarda tanlanadi.</p>
+      <form id="fan-qoshish-form" method="post" action="{{ url_for('fan_qoshish') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>Fan nomi:</label>
+        <input type="text" name="fan" required placeholder="Masalan: Matematika">
+        <button type="submit">Qo'shish</button>
+      </form>
+      <div id="fan-xabar" style="margin-top:10px;color:#155724"></div>
+    </div>
+    <div class="auth-form">
+      <h2>Sinflar ({{ sinflar | length }})</h2>
+      <ul class="fanlar-royxati">
+        {% for sinf in sinflar | sort %}
+        <li class="fan-qator">
+          <span class="fan-nomi">{{ sinf }}</span>
+          <span class="qator-amallar">
+            <form method="post" action="{{ url_for('sinf_tahrirlash') }}" onsubmit="return sinfTahrirlash(this)" class="tahrirlash-formasi">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="eski_sinf" value="{{ sinf }}">
+              <input type="text" name="yangi_sinf" value="{{ sinf }}" aria-label="{{ sinf }} sinfining yangi nomi">
+              <button type="submit" class="btn btn-tahrirlash">Saqlash</button>
+            </form>
+            <form method="post" action="{{ url_for('sinf_ochirish') }}" onsubmit="return sinfOchirish(this)">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="sinf" value="{{ sinf }}">
+              <button type="submit" class="btn btn-ochirish">O'chirish</button>
+            </form>
+          </span>
+        </li>
+        {% else %}
+        <li style="padding:6px 0;color:#666">Hali sinf qo'shilmagan.</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="auth-form">
+      <h2>Fanlar ({{ fanlar | length }}) — barcha sinflar uchun</h2>
+      <ul class="fanlar-royxati">
+        {% for fan in fanlar | sort %}
+        <li class="fan-qator">
+          <span class="fan-nomi">{{ fan }}</span>
+          <span class="qator-amallar">
+            <form method="post" action="{{ url_for('fan_tahrirlash') }}" onsubmit="return fanTahrirlash(this)" class="tahrirlash-formasi">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="eski_fan" value="{{ fan }}">
+              <input type="text" name="yangi_fan" value="{{ fan }}" aria-label="{{ fan }} fanining yangi nomi">
+              <button type="submit" class="btn btn-tahrirlash">Saqlash</button>
+            </form>
+            <form method="post" action="{{ url_for('fan_ochirish') }}" onsubmit="return fanOchirish(this, '{{ fan }}')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="fan" value="{{ fan }}">
+              <button type="submit" class="btn btn-ochirish">O'chirish</button>
+            </form>
+          </span>
+        </li>
+        {% else %}
+        <li style="padding:6px 0;color:#666">Hali fan qo'shilmagan.</li>
+        {% endfor %}
+      </ul>
+    </div>
+
   {% elif sahifa == 'ochish' %}
     <div class="nav" style="text-align:left; background:transparent; padding:0; box-shadow:none; position:static">
       <button type="button" class="btn-qaytish" onclick="qaytish()">
@@ -999,7 +1125,7 @@ HTML = """
       </button>
     </div>
     <div class="reader">
-      <h2>{{ kitob.nomi }} — {{ kitob.muallif }}</h2>
+      <h2>{% if kitob.nomi %}{{ kitob.nomi }}{% if kitob.muallif %} — {% endif %}{% endif %}{{ kitob.muallif or '' }}</h2>
       <p style="color:#666">PDF hajmi: {{ fayl_hajmi(kitob.fayl) }}</p>
 
       <div id="pdf-controls" style="background:#1a3a6e; padding:12px; border-radius:8px; margin:10px 0; display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:space-between; position:fixed; bottom:0; left:0; right:0; z-index:1000; box-shadow:0 -4px 12px rgba(0,0,0,0.2); color:white">
@@ -1148,7 +1274,7 @@ HTML = """
 
     function pdfTugmaYangila() {
       const b = document.getElementById('pdf-oqi-btn');
-      if (b) b.textContent = pdfOqilmoqda ? '⏹ O\'qishni to\'xtatish' : '🔊 Ovozli o\'qish';
+      if (b) b.textContent = pdfOqilmoqda ? '⏹ O\\'qishni to\\'xtatish' : '🔊 Ovozli o\\'qish';
     }
 
     function pdfOvozTanla() {
@@ -1166,7 +1292,7 @@ HTML = """
 
     function pdfOqi() {
       if (!('speechSynthesis' in window)) {
-        alert('Bu brauzerda ovozli o\'qish qo\'llab-quvvatlanmaydi.');
+        alert('Bu brauzerda ovozli o\\'qish qo\\'llab-quvvatlanmaydi.');
         return;
       }
       if (pdfOqilmoqda) {
@@ -1236,11 +1362,13 @@ HTML = """
 
   {% elif sahifa == 'ochish_drive' %}
     <div class="reader">
-      <h2>{{ kitob.nomi }} — {{ kitob.muallif }}</h2>
+      <h2>{% if kitob.nomi %}{{ kitob.nomi }}{% if kitob.muallif %} — {% endif %}{% endif %}{{ kitob.muallif or '' }}</h2>
 
       <div id="drive-controls" style="display:flex; align-items:center; justify-content:space-between; align-content:center; position:fixed; bottom:0; left:0; right:0; z-index:1000; padding:14px 20px; background:linear-gradient(135deg, #1a3a6e, #2c5aa0); box-shadow:0 -4px 12px rgba(0,0,0,0.3); color:white">
         <button onclick="qaytish()" class="btn-chiqish-pastki">⬅ Chiqish</button>
-        <button onclick="gapir('Kitob nomi: {{ kitob.nomi|e }}. Muallif: {{ kitob.muallif|e }}.')" class="btn-yuklab-ochish" aria-label="Kitob nomi va muallifini ovozda eshitish">🔊 Ovozda eshitish</button>
+        {% if kitob.nomi or kitob.muallif %}
+        <button onclick="gapir({% if kitob.nomi %}'Kitob nomi: {{ kitob.nomi|e }}. '{% endif %}{% if kitob.muallif %}'Muallif: {{ kitob.muallif|e }}.'{% endif %})" class="btn-yuklab-ochish" aria-label="Kitob nomi va muallifini ovozda eshitish">🔊 Ovozda eshitish</button>
+        {% endif %}
         <a href="{{ drive_download }}" target="_blank" rel="noopener" class="btn-yuklab-ochish">⬇ Yuklab olish</a>
       </div>
 
@@ -1509,9 +1637,9 @@ const SAHIFA_NOMLARI = {
   tasdiqlash: "Email tasdiqlash sahifasi.",
   foydalanuvchilar: "Foydalanuvchilar sahifasi.",
   foydalanuvchi_tahrirlash: "Foydalanuvchini tahrirlash sahifasi.",
+  fanlar: "Sinflar va fanlar ro'yxati sahifasi.",
   qoshish: "Yangi kitob qoshish sahifasi.",
   tahrirlash: "Kitobni tahrirlash sahifasi.",
-  audio_tahrirlash: "Audio kitobni tahrirlash sahifasi.",
   ochish: "PDF kitob oqish sahifasi.",
   ochish_drive: "Google Drive kitob oqish sahifasi."
 };
@@ -1540,14 +1668,6 @@ document.addEventListener('DOMContentLoaded', function() {
   if (akyHolat.diktor) setTimeout(akySahifaAyt, 700);
 });
 
-function nomiYordamchi(h3) {
-  const txt = (h3.textContent || '').replace(/\\s+/g, ' ').trim();
-  const sinfMatch = txt.match(/^(\\d+)-sinf\\s*/i);
-  const sinf = sinfMatch ? sinfMatch[1] : '';
-  let fan = sinfMatch ? txt.slice(sinfMatch[0].length).trim() : txt;
-  fan = fan.replace(/\\s*\\d+-qism\\s*$/i, '').trim();
-  return { sinf, fan };
-}
 function saralashIshgaTush() {
   const sinf = document.getElementById('sinf-filter').value;
   const fan = document.getElementById('fan-filter').value;
@@ -1574,21 +1694,136 @@ function saralashTiklash() {
   saralashIshgaTush();
 }
 document.addEventListener('DOMContentLoaded', function() {
-  const sinflar = new Set(), fanlar = new Set();
-  document.querySelectorAll('.karta').forEach(karta => {
-    const h3 = karta.querySelector('h3');
-    if (!h3) return;
-    const { sinf, fan } = nomiYordamchi(h3);
-    karta.dataset.sinf = sinf;
-    karta.dataset.fan = fan;
-    if (sinf) sinflar.add(sinf);
-    if (fan) fanlar.add(fan);
+  [document.getElementById('sinf-filter'), document.getElementById('fan-filter')]
+    .forEach(el => { if (el) el.addEventListener('change', saralashIshgaTush); });
+});
+
+{% if sahifa == 'qidirish' %}
+document.addEventListener('DOMContentLoaded', function() {
+  const maydon = document.getElementById('qidiruv-maydon');
+  const forma = document.getElementById('qidiruv-form');
+  if (!maydon || !forma) return;
+  let taymer = null;
+  maydon.addEventListener('input', function() {
+    clearTimeout(taymer);
+    taymer = setTimeout(function() { forma.submit(); }, 400);
   });
-  const sinfSelect = document.getElementById('sinf-filter');
-  [...sinflar].sort().forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s + '-sinf'; sinfSelect.appendChild(o); });
-  const fanSelect = document.getElementById('fan-filter');
-  [...fanlar].sort().forEach(f => { const o = document.createElement('option'); o.value = f; o.textContent = f; fanSelect.appendChild(o); });
-  [sinfSelect, fanSelect].forEach(el => el.addEventListener('change', saralashIshgaTush));
+  maydon.focus();
+});
+{% endif %}
+
+function sinfQoshish(e) {
+  e.preventDefault();
+  const form = e.target;
+  const csrf = form.querySelector('input[name="csrf_token"]').value;
+  const sinf = form.querySelector('input[name="sinf"]').value.trim();
+  const xabar = document.getElementById('sinf-xabar');
+  if (!sinf) { xabar.style.color = '#721c24'; xabar.textContent = 'Sinf nomini kiriting'; return; }
+  fetch("{{ url_for('sinf_qoshish') }}", {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+    body: new URLSearchParams({ sinf })
+  }).then(r => r.json()).then(data => {
+    if (data.muvaffaqiyat) {
+      xabar.style.color = '#155724'; xabar.textContent = 'Sinf qo\\'shildi! Sahifani yangilang.';
+      form.reset();
+      setTimeout(() => location.reload(), 800);
+    } else {
+      xabar.style.color = '#721c24'; xabar.textContent = data.xato || 'Xato';
+    }
+  });
+}
+function sinfOchirish(form) {
+  const csrf = form.querySelector('input[name="csrf_token"]').value;
+  const sinf = form.querySelector('input[name="sinf"]').value;
+  if (!confirm('"' + sinf + '" sinfini o\\'chirishga ishonchingiz komilmi?')) return false;
+  fetch("{{ url_for('sinf_ochirish') }}", {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+    body: new URLSearchParams({ sinf })
+  }).then(r => r.json()).then(data => {
+    if (data.muvaffaqiyat) location.reload();
+    else alert(data.xato || 'Xato');
+  });
+  return false;
+}
+function sinfTahrirlash(form) {
+  const csrf = form.querySelector('input[name="csrf_token"]').value;
+  const eski = form.querySelector('input[name="eski_sinf"]').value;
+  const yangi = form.querySelector('input[name="yangi_sinf"]').value.trim();
+  const xabar = document.getElementById('sinf-xabar');
+  if (!yangi) { xabar.style.color = '#721c24'; xabar.textContent = 'Yangi sinf nomini kiriting'; return false; }
+  fetch("{{ url_for('sinf_tahrirlash') }}", {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+    body: new URLSearchParams({ eski_sinf: eski, yangi_sinf: yangi })
+  }).then(r => r.json()).then(data => {
+    if (data.muvaffaqiyat) location.reload();
+    else {
+      xabar.style.color = '#721c24';
+      xabar.textContent = data.xato || 'Xato';
+    }
+  }).catch(() => {});
+  return false;
+}
+function fanTahrirlash(form) {
+  const csrf = form.querySelector('input[name="csrf_token"]').value;
+  const eski = form.querySelector('input[name="eski_fan"]').value;
+  const yangi = form.querySelector('input[name="yangi_fan"]').value.trim();
+  const xabar = document.getElementById('fan-xabar');
+  if (!yangi) { xabar.style.color = '#721c24'; xabar.textContent = 'Yangi fan nomini kiriting'; return false; }
+  fetch("{{ url_for('fan_tahrirlash') }}", {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+    body: new URLSearchParams({ eski_fan: eski, yangi_fan: yangi })
+  }).then(r => r.json()).then(data => {
+    if (data.muvaffaqiyat) location.reload();
+    else {
+      xabar.style.color = '#721c24';
+      xabar.textContent = data.xato || 'Xato';
+    }
+  }).catch(() => {});
+  return false;
+}
+function fanQoshish(e) {
+  e.preventDefault();
+  const form = e.target;
+  const csrf = form.querySelector('input[name="csrf_token"]').value;
+  const fan = form.querySelector('input[name="fan"]').value.trim();
+  const xabar = document.getElementById('fan-xabar');
+  if (!fan) { xabar.style.color = '#721c24'; xabar.textContent = 'Fan nomini kiriting'; return; }
+  fetch("{{ url_for('fan_qoshish') }}", {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+    body: new URLSearchParams({ fan })
+  }).then(r => r.json()).then(data => {
+    if (data.muvaffaqiyat) {
+      xabar.style.color = '#155724'; xabar.textContent = 'Fan qo\\'shildi! Sahifani yangilang.';
+      form.reset();
+      setTimeout(() => location.reload(), 800);
+    } else {
+      xabar.style.color = '#721c24'; xabar.textContent = data.xato || 'Xato';
+    }
+  });
+}
+function fanOchirish(form, fanNomi) {
+  const csrf = form.querySelector('input[name="csrf_token"]').value;
+  if (!confirm('"'+fanNomi+'" ni barcha sinflardan o\\'chirishga ishonchingiz komilmi?')) return false;
+  fetch("{{ url_for('fan_ochirish') }}", {
+    method: 'POST',
+    headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+    body: new URLSearchParams({ fan: form.querySelector('input[name="fan"]').value })
+  }).then(r => r.json()).then(data => {
+    if (data.muvaffaqiyat) location.reload();
+    else alert(data.xato || 'Xato');
+  });
+  return false;
+}
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('fan-qoshish-form');
+  if (form) form.addEventListener('submit', fanQoshish);
+  const sinfForm = document.getElementById('sinf-qoshish-form');
+  if (sinfForm) sinfForm.addEventListener('submit', sinfQoshish);
 });
 </script>
 </body>
@@ -1603,8 +1838,7 @@ def bosh_sahifa():
                                    malumot=kitoblar_yuklash(),
                                    foydalanuvchi=user,
                                    sevimlilar=foydalanuvchi_sevimlilari(user["email"]) if user else set(),
-                                   texnikum_rasmlari=texnikum_rasmlari(),
-                                   audiollar=audio_yuklash())
+                                   texnikum_rasmlari=texnikum_rasmlari())
 
 
 @app.route("/qidirish")
@@ -1615,7 +1849,9 @@ def qidirish():
     if so_rov:
         for bolim, kitoblar in kitoblar_yuklash().items():
             for idx, kitob in enumerate(kitoblar):
-                if so_rov in kitob["nomi"].lower() or so_rov in kitob["muallif"].lower():
+                sf = kitob_sinf_fani(kitob)
+                maydonlar = (kitob.get("nomi", ""), kitob.get("muallif", ""), sf["sinf"], sf["fan"])
+                if any(so_rov in (m or "").lower() for m in maydonlar):
                     natija.append({"bolim": bolim, "idx": idx, "kitob": kitob})
     return render_template_string(HTML, sahifa="qidirish", bolimlar=BO_LIMLAR,
                                    so_rov=so_rov, natija=natija, foydalanuvchi=user,
@@ -1681,104 +1917,6 @@ def sevimli_belgilash_id(kitob_id):
         faol = True
     foydalanuvchilar_saqlash(f)
     return jsonify({"faol": faol})
-
-
-@app.route("/audio")
-def audio_sahifa():
-    return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
-
-
-@app.route("/audio/qoshish", methods=["POST"])
-def audio_qoshish():
-    if not joriy_foydalanuvchi():
-        flash("Audio kitob qo'shish uchun tizimga kiring", "xato")
-        return redirect(url_for("kirish"))
-    nomi = request.form.get("nomi", "").strip()
-    muallif = request.form.get("muallif", "").strip()
-    telegram_havola = request.form.get("telegram_havola", "").strip()
-    google_drive_havola = request.form.get("google_drive_havola", "").strip()
-    if not nomi:
-        flash("Kitob nomini kiriting", "xato")
-        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
-    if not telegram_havola and not google_drive_havola:
-        flash("Telegram yoki Google Drive havolasini kiriting", "xato")
-        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
-    if telegram_havola and not telegram_havolasi_mi(telegram_havola):
-        flash("Telegram havolasi https://t.me/... ko'rinishida bo'lishi kerak", "xato")
-        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
-    if google_drive_havola and not google_drive_havolasi_mi(google_drive_havola):
-        flash("Google Drive havolasi https://drive.google.com/file/d/ID/... ko'rinishida bo'lishi kerak", "xato")
-        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
-    roy = audio_yuklash()
-    roy.append({
-        "nomi": nomi,
-        "muallif": muallif,
-        "telegram_havola": telegram_havola,
-        "google_drive_havola": google_drive_havola,
-        "tomonidan": joriy_foydalanuvchi()["email"],
-    })
-    audio_saqlash(roy)
-    flash("Audio kitob qo'shildi!", "muvaffaqiyat")
-    return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
-
-
-@app.route("/audio/tahrirlash/<int:idx>", methods=["GET", "POST"])
-def audio_tahrirlash(idx):
-    user = joriy_foydalanuvchi()
-    if not user:
-        return redirect(url_for("kirish"))
-    roy = audio_yuklash()
-    if idx < 0 or idx >= len(roy):
-        flash("Audio kitob topilmadi", "xato")
-        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
-    if not admin_mi() and roy[idx].get("tomonidan") != user["email"]:
-        flash("Faqat o'zingiz qo'shgan audio kitobni tahrirlashingiz mumkin", "xato")
-        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
-    if request.method == "POST":
-        nomi = request.form.get("nomi", "").strip()
-        muallif = request.form.get("muallif", "").strip()
-        telegram_havola = request.form.get("telegram_havola", "").strip()
-        google_drive_havola = request.form.get("google_drive_havola", "").strip()
-        if not nomi:
-            flash("Kitob nomini kiriting", "xato")
-            return redirect(url_for("audio_tahrirlash", idx=idx))
-        if not telegram_havola and not google_drive_havola:
-            flash("Telegram yoki Google Drive havolasini kiriting", "xato")
-            return redirect(url_for("audio_tahrirlash", idx=idx))
-        if telegram_havola and not telegram_havolasi_mi(telegram_havola):
-            flash("Telegram havolasi https://t.me/... ko'rinishida bo'lishi kerak", "xato")
-            return redirect(url_for("audio_tahrirlash", idx=idx))
-        if google_drive_havola and not google_drive_havolasi_mi(google_drive_havola):
-            flash("Google Drive havolasi https://drive.google.com/file/d/ID/... ko'rinishida bo'lishi kerak", "xato")
-            return redirect(url_for("audio_tahrirlash", idx=idx))
-        roy[idx]["nomi"] = nomi
-        roy[idx]["muallif"] = muallif
-        roy[idx]["telegram_havola"] = telegram_havola
-        roy[idx]["google_drive_havola"] = google_drive_havola
-        audio_saqlash(roy)
-        flash("Audio kitob saqlandi", "muvaffaqiyat")
-        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
-    return render_template_string(HTML, sahifa="audio_tahrirlash",
-                                   kitob=roy[idx],
-                                   foydalanuvchi=user)
-
-
-@app.route("/audio/ochirish/<int:idx>", methods=["POST"])
-def audio_ochirish(idx):
-    user = joriy_foydalanuvchi()
-    if not user:
-        return redirect(url_for("kirish"))
-    roy = audio_yuklash()
-    if idx < 0 or idx >= len(roy):
-        flash("Audio kitob topilmadi", "xato")
-        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
-    if not admin_mi() and roy[idx].get("tomonidan") != user["email"]:
-        flash("Faqat o'zingiz qo'shgan audio kitobni o'chirishingiz mumkin", "xato")
-        return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
-    roy.pop(idx)
-    audio_saqlash(roy)
-    flash("Audio kitob o'chirildi", "muvaffaqiyat")
-    return redirect(url_for("bosh_sahifa") + "#audio-kitoblar")
 
 
 @app.route("/royxat", methods=["GET", "POST"])
@@ -1979,23 +2117,190 @@ def foydalanuvchi_tahrirlash(email):
                                    foydalanuvchi=joriy_foydalanuvchi())
 
 
+@app.route("/fanlar")
+def fanlar_sahifa():
+    if not admin_mi():
+        flash("Bu sahifa faqat admin uchun", "xato")
+        return redirect(url_for("bosh_sahifa"))
+    malumot = fanlar_yuklash()
+    return render_template_string(HTML, sahifa="fanlar", sinflar=malumot["sinflar"],
+                                  fanlar=malumot["fanlar"], foydalanuvchi=joriy_foydalanuvchi())
+
+
+def admin_natija(muvaffaqiyat_xabari, xato=None, holat=200):
+    """AJAX so'roviga JSON, oddiy brauzer so'roviga esa /fanlar sahifasiga qaytaradi.
+
+    Shu bilan forma JavaScript o'chirilgan holatda ham ishlayveradi."""
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        if xato:
+            return jsonify({"xato": xato}), holat
+        return jsonify({"muvaffaqiyat": True})
+    flash(xato or muvaffaqiyat_xabari, "xato" if xato else "muvaffaqiyat")
+    return redirect(url_for("fanlar_sahifa"))
+
+
+def admin_ruxsat():
+    if admin_mi():
+        return None
+    return admin_natija("", xato="Bu amal faqat admin uchun", holat=403)
+
+
+@app.route("/fanlar/qoshish", methods=["POST"])
+def fan_qoshish():
+    """Bitta fan qo'shadi. Fan ro'yxati barcha sinflar uchun umumiy."""
+    ruxsat = admin_ruxsat()
+    if ruxsat:
+        return ruxsat
+    fan = request.form.get("fan", "").strip()
+    if not fan:
+        return admin_natija("", xato="Fan nomini kiriting", holat=400)
+    malumot = fanlar_yuklash()
+    if any(x.strip().lower() == fan.lower() for x in malumot["fanlar"]):
+        return admin_natija("", xato=f"'{fan}' fani allaqachon mavjud", holat=400)
+    malumot["fanlar"].append(fan)
+    fanlar_saqlash(malumot)
+    return admin_natija(f"'{fan}' fani barcha sinflar uchun qo'shildi")
+
+
+@app.route("/sinf/qoshish", methods=["POST"])
+def sinf_qoshish():
+    ruxsat = admin_ruxsat()
+    if ruxsat:
+        return ruxsat
+    sinf = request.form.get("sinf", "").strip()
+    if not sinf:
+        return admin_natija("", xato="Sinf nomini kiriting", holat=400)
+    malumot = fanlar_yuklash()
+    if sinf in malumot["sinflar"]:
+        return admin_natija("", xato="Bu sinf allaqachon mavjud", holat=400)
+    malumot["sinflar"].append(sinf)
+    fanlar_saqlash(malumot)
+    return admin_natija(f"'{sinf}' sinfi qo'shildi")
+
+
+@app.route("/sinf/ochirish", methods=["POST"])
+def sinf_ochirish():
+    ruxsat = admin_ruxsat()
+    if ruxsat:
+        return ruxsat
+    sinf = request.form.get("sinf", "").strip()
+    malumot = fanlar_yuklash()
+    if sinf not in malumot["sinflar"]:
+        return admin_natija("", xato="Sinf topilmadi", holat=404)
+    m = kitoblar_yuklash()
+    kitoblar_soni = sum(
+        1 for kitoblar in m.values() for k in kitoblar if (k.get("sinf") or "") == sinf
+    )
+    if kitoblar_soni:
+        return admin_natija("", xato=(
+            f"Bu sinfga {kitoblar_soni} ta kitob biriktirilgan. "
+            "Avval kitoblarni boshqa sinfga o'tkazing."
+        ), holat=400)
+    malumot["sinflar"].remove(sinf)
+    fanlar_saqlash(malumot)
+    return admin_natija(f"'{sinf}' sinfi o'chirildi")
+
+
+@app.route("/sinf/tahrirlash", methods=["POST"])
+def sinf_tahrirlash():
+    """Sinfni qayta nomlaydi va kitoblardagi sinf nomini ham yangilaydi."""
+    ruxsat = admin_ruxsat()
+    if ruxsat:
+        return ruxsat
+    eski = request.form.get("eski_sinf", "").strip()
+    yangi = request.form.get("yangi_sinf", "").strip()
+    malumot = fanlar_yuklash()
+    if eski not in malumot["sinflar"]:
+        return admin_natija("", xato="Sinf topilmadi", holat=404)
+    if not yangi:
+        return admin_natija("", xato="Yangi sinf nomini kiriting", holat=400)
+    if yangi != eski and yangi in malumot["sinflar"]:
+        return admin_natija("", xato=f"'{yangi}' sinfi allaqachon mavjud", holat=400)
+    if yangi != eski:
+        malumot["sinflar"][malumot["sinflar"].index(eski)] = yangi
+        fanlar_saqlash(malumot)
+        m = kitoblar_yuklash()
+        o_zgardi = False
+        for kitoblar in m.values():
+            for kitob in kitoblar:
+                if kitob.get("sinf") == eski:
+                    kitob["sinf"] = yangi
+                    o_zgardi = True
+        if o_zgardi:
+            kitoblar_saqlash(m)
+    return admin_natija(f"'{eski}' sinfi '{yangi}' deb yangilandi")
+
+
+@app.route("/fan/tahrirlash", methods=["POST"])
+def fan_tahrirlash():
+    """Fan nomini qayta nomlaydi. Fanlar umumiy bo'lgani uchun barcha
+    sinflardagi kitoblar ham yangilanadi."""
+    ruxsat = admin_ruxsat()
+    if ruxsat:
+        return ruxsat
+    eski = request.form.get("eski_fan", "").strip()
+    yangi = request.form.get("yangi_fan", "").strip()
+    malumot = fanlar_yuklash()
+    if eski not in malumot["fanlar"]:
+        return admin_natija("", xato="Fan topilmadi", holat=404)
+    if not yangi:
+        return admin_natija("", xato="Yangi fan nomini kiriting", holat=400)
+    if yangi != eski and any(x.strip().lower() == yangi.lower() for x in malumot["fanlar"]):
+        return admin_natija("", xato=f"'{yangi}' fani allaqachon mavjud", holat=400)
+    if yangi != eski:
+        malumot["fanlar"][malumot["fanlar"].index(eski)] = yangi
+        fanlar_saqlash(malumot)
+        m = kitoblar_yuklash()
+        o_zgardi = False
+        for kitoblar in m.values():
+            for kitob in kitoblar:
+                if kitob.get("fan") == eski:
+                    kitob["fan"] = yangi
+                    o_zgardi = True
+        if o_zgardi:
+            kitoblar_saqlash(m)
+    return admin_natija(f"'{eski}' fani '{yangi}' deb yangilandi")
+
+
+@app.route("/fanlar/ochirish", methods=["POST"])
+def fan_ochirish():
+    """Fan ro'yxatidan o'chiradi. Fan umumiy bo'lgani uchun hamma sinflardan
+    o'chadi, lekin kitoblardagi `fan` maydoni saqlanib qoladi."""
+    ruxsat = admin_ruxsat()
+    if ruxsat:
+        return ruxsat
+    fan = request.form.get("fan", "").strip()
+    malumot = fanlar_yuklash()
+    if fan not in malumot["fanlar"]:
+        return admin_natija("", xato="Bunday fan topilmadi", holat=404)
+    malumot["fanlar"].remove(fan)
+    fanlar_saqlash(malumot)
+    return admin_natija(f"'{fan}' fani barcha sinflardan o'chirildi")
+
+
 @app.route("/qoshish", methods=["GET", "POST"])
 def qoshish():
     if not joriy_foydalanuvchi():
         flash("Kitob qo'shish uchun tizimga kiring", "xato")
         return redirect(url_for("kirish"))
     if request.method == "POST":
-        bolim = request.form.get("bolim")
+        bolim = request.form.get("bolim", "").strip()
+        sinf = request.form.get("sinf", "").strip()
+        fan = request.form.get("fan", "").strip()
         nomi = request.form.get("nomi", "").strip()
         muallif = request.form.get("muallif", "").strip()
         yili = request.form.get("yili", "").strip()
         telegram_havola = request.form.get("telegram_havola", "").strip()
         google_drive_havola = request.form.get("google_drive_havola", "").strip()
         if bolim not in BO_LIMLAR:
-            flash("Noto'g'ri bo'lim tanlandi", "xato")
+            flash("Bo'limni tanlang", "xato")
             return redirect(url_for("qoshish"))
-        if not nomi or not muallif or not yili:
-            flash("Kitob nomi, muallif va yili to'ldirilishi shart", "xato")
+        fanlar = fanlar_yuklash()
+        if not sinf or sinf not in fanlar["sinflar"]:
+            flash("Sinfni tanlang", "xato")
+            return redirect(url_for("qoshish"))
+        if not fan or fan not in fanlar["fanlar"]:
+            flash("Fanni tanlang", "xato")
             return redirect(url_for("qoshish"))
         if not telegram_havola and not google_drive_havola:
             flash("Telegram yoki Google Drive havolasini kiriting", "xato")
@@ -2017,6 +2322,7 @@ def qoshish():
             muqova_nom = secure_filename(f.filename)
             with open(os.path.join(app.config["COVER_FOLDER"], muqova_nom), "wb") as out:
                 out.write(rasm)
+        m.setdefault(bolim, [])
         m[bolim].append({
             "nomi": nomi,
             "muallif": muallif,
@@ -2025,11 +2331,16 @@ def qoshish():
             "telegram_havola": telegram_havola,
             "google_drive_havola": google_drive_havola,
             "tomonidan": joriy_foydalanuvchi()["email"],
+            "sinf": sinf,
+            "fan": fan,
         })
         kitoblar_saqlash(m)
         flash("Kitob qo'shildi!", "muvaffaqiyat")
         return redirect(url_for("bosh_sahifa", _anchor=bolim_slug(bolim)))
-    return render_template_string(HTML, sahifa="qoshish", bolimlar=BO_LIMLAR, foydalanuvchi=joriy_foydalanuvchi())
+    malumot = fanlar_yuklash()
+    return render_template_string(HTML, sahifa="qoshish", bolimlar=BO_LIMLAR,
+                                  sinflar=malumot["sinflar"], fanlar=malumot["fanlar"],
+                                  foydalanuvchi=joriy_foydalanuvchi())
 
 
 @app.route("/tahrirlash/<bolim>/<int:idx>", methods=["GET", "POST"])
@@ -2049,10 +2360,16 @@ def tahrirlash(bolim, idx):
         nomi = request.form.get("nomi", "").strip()
         muallif = request.form.get("muallif", "").strip()
         yili = request.form.get("yili", "").strip()
+        sinf = request.form.get("sinf", "").strip()
+        fan = request.form.get("fan", "").strip()
         telegram_havola = request.form.get("telegram_havola", "").strip()
         google_drive_havola = request.form.get("google_drive_havola", "").strip()
-        if not nomi or not muallif or not yili:
-            flash("Kitob nomi, muallif va yili to'ldirilishi shart", "xato")
+        fanlar = fanlar_yuklash()
+        if sinf and sinf not in fanlar["sinflar"]:
+            flash("Bunday sinf yo'q", "xato")
+            return redirect(url_for("tahrirlash", bolim=bolim, idx=idx))
+        if fan and fan not in fanlar["fanlar"]:
+            flash("Bunday fan ro'yxatda yo'q", "xato")
             return redirect(url_for("tahrirlash", bolim=bolim, idx=idx))
         if not telegram_havola and not google_drive_havola:
             flash("Telegram yoki Google Drive havolasini kiriting", "xato")
@@ -2081,10 +2398,15 @@ def tahrirlash(bolim, idx):
         m[bolim][idx]["yili"] = yili
         m[bolim][idx]["telegram_havola"] = telegram_havola
         m[bolim][idx]["google_drive_havola"] = google_drive_havola
+        m[bolim][idx]["sinf"] = sinf
+        m[bolim][idx]["fan"] = fan
         kitoblar_saqlash(m)
+        flash("Kitob saqlandi", "muvaffaqiyat")
         return redirect(url_for("bosh_sahifa", _anchor=bolim_slug(bolim)))
+    malumot = fanlar_yuklash()
     return render_template_string(HTML, sahifa="tahrirlash", bolimlar=BO_LIMLAR,
-                                   kitob=kitob, foydalanuvchi=user)
+                                  kitob=kitob, foydalanuvchi=user,
+                                  sinflar=malumot["sinflar"], fanlar=malumot["fanlar"])
 
 
 @app.route("/ochirish/<bolim>/<int:idx>", methods=["POST"])
