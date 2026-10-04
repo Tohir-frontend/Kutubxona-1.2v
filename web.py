@@ -52,8 +52,19 @@ BO_LIMLAR = [
     "Badiiy adabiyotlar",
 ]
 
-os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
-os.makedirs(app.config["COVER_FOLDER"], exist_ok=True)
+def _papka_tayyorla(yol):
+    """Papkani yaratadi. Xostingda yozish huquqi yo'q bo'lsa ham ilova
+    import qilinib qolishi kerak — aks holda butun sayt 500 beradi."""
+    try:
+        os.makedirs(yol, exist_ok=True)
+    except OSError as e:
+        print(f"OGOHLANTIRISH: '{yol}' papkasini yaratib bo'lmadi ({e}). "
+              "Fayl yuklash funksiyalari ishlamaydi. Papkani qo'lda yarating va "
+              "unga yozish huquqini bering (chmod 755/775).")
+
+
+_papka_tayyorla(app.config["UPLOAD_FOLDER"])
+_papka_tayyorla(app.config["COVER_FOLDER"])
 
 
 def foydalanuvchilar_yuklash():
