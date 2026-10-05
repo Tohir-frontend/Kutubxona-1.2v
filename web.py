@@ -17,6 +17,9 @@ from urllib.parse import urlparse
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
+SITE_SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "site_settings.json")
+DEFAULT_SITE_TITLE = "Urganch shahar 25-son maktab — Kutubxona"
+
 app = Flask(__name__)
 
 _maxfiy_kalit = os.getenv("SECRET_KEY")
@@ -246,10 +249,39 @@ def fayl_hajmi(fayl_nomi):
 app.jinja_env.globals["fayl_hajmi"] = fayl_hajmi
 
 
-def texnikum_rasmlari():
+def _get_texnikum_dir():
     papka = os.path.join(os.path.dirname(__file__), "static", "texnikum")
-    if not os.path.exists(papka):
-        return []
+    os.makedirs(papka, exist_ok=True)
+    return papka
+
+
+def site_settings_yuklash():
+    try:
+        with open(SITE_SETTINGS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            raise ValueError("Site settings must be a JSON object")
+    except (FileNotFoundError, json.JSONDecodeError, ValueError):
+        data = {"title": DEFAULT_SITE_TITLE}
+        site_settings_saqlash(data)
+    data.setdefault("title", DEFAULT_SITE_TITLE)
+    return data
+
+
+def site_settings_saqlash(data):
+    with open(SITE_SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def site_title():
+    return (site_settings_yuklash().get("title") or DEFAULT_SITE_TITLE).strip() or DEFAULT_SITE_TITLE
+
+
+app.jinja_env.globals["site_title"] = site_title
+
+
+def texnikum_rasmlari():
+    papka = _get_texnikum_dir()
     rasm_turlari = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
     tartib = {"texnikum1": 0, "kitob": 1, "texnikum2": 2}
     rasmlar = [f for f in os.listdir(papka) if os.path.splitext(f)[1].lower() in rasm_turlari]
@@ -764,6 +796,8 @@ HTML = """
   .saralash { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
   .saralash label { color: #fff; font-weight: bold; font-size: 14px; }
   .saralash select { padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.4); background: #fff; color: #1a3a6e; font-size: 14px; min-width: 140px; cursor: pointer; }
+  .saralash .filter-group { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; flex-shrink: 1; min-width: 0; }
+  .saralash .filter-group select { min-width: 110px; flex: 1 1 auto; }
   .saralash button { padding: 8px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.2); color: #fff; cursor: pointer; font-size: 13px; font-weight: bold; transition: background 0.2s; }
   .saralash button:hover { background: rgba(255,255,255,0.35); }
   body.tungi .saralash { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); }
@@ -790,7 +824,7 @@ HTML = """
 <div id="aky-announce" class="ekran-oquvchi" role="status" aria-live="assertive"></div>
 <div class="header">
   <div class="header-inner">
-    <h1>Urganch shahar 25-son maktab — Kutubxona</h1>
+    <h1>{{ site_title() }}</h1>
     <div class="header-right">
       {% if foydalanuvchi %}
         <span>Salom, <b>{{ foydalanuvchi.ism }}</b>!</span>
@@ -818,6 +852,7 @@ HTML = """
         <a href="{{ url_for('qoshish') }}">Kitob qo'shish</a>
         <a href="{{ url_for('sevimlilar_sahifa') }}">★ Sevimlilarim</a>
         {% if foydalanuvchi.rol == 'admin' %}
+          <a href="{{ url_for('admin_boshqaruv') }}">🛠️ Boshqaruv paneli</a>
           <a href="{{ url_for('fanlar_sahifa') }}">📚 Fanlar va sinflar</a>
           <a href="{{ url_for('foydalanuvchilar_sahifa') }}">👥 Foydalanuvchilar</a>
         {% endif %}
@@ -842,20 +877,24 @@ HTML = """
 
     {% set filt_sinf, filt_fan = filtr %}
     <div class="saralash" id="saralash-panel">
-      <label for="sinf-filter">Sinf:</label>
-      <select id="sinf-filter" aria-label="Sinf bo'yicha saralash">
-        <option value="">Barcha sinflar</option>
-        {% for sinf in filt_sinf %}
-        <option value="{{ sinf }}">{{ sinf }}</option>
-        {% endfor %}
-      </select>
-      <label for="fan-filter">Fan:</label>
-      <select id="fan-filter" aria-label="Fan bo'yicha saralash">
-        <option value="">Barcha fanlar</option>
-        {% for fan in filt_fan %}
-        <option value="{{ fan }}">{{ fan }}</option>
-        {% endfor %}
-      </select>
+      <span class="filter-group">
+        <label for="sinf-filter">Sinf:</label>
+        <select id="sinf-filter" aria-label="Sinf bo'yicha saralash">
+          <option value="">Barcha sinflar</option>
+          {% for sinf in filt_sinf %}
+          <option value="{{ sinf }}">{{ sinf }}</option>
+          {% endfor %}
+        </select>
+      </span>
+      <span class="filter-group">
+        <label for="fan-filter">Fan:</label>
+        <select id="fan-filter" aria-label="Fan bo'yicha saralash">
+          <option value="">Barcha fanlar</option>
+          {% for fan in filt_fan %}
+          <option value="{{ fan }}">{{ fan }}</option>
+          {% endfor %}
+        </select>
+      </span>
       <button type="button" onclick="saralashTiklash()">Tozalash</button>
     </div>
 
@@ -1107,6 +1146,50 @@ HTML = """
         <button type="submit">Saqlash</button>
     </form>
 
+  {% elif sahifa == 'admin_boshqaruv' %}
+    <div class="nav"><a href="{{ url_for('bosh_sahifa') }}">Bosh sahifa</a></div>
+    <div class="auth-form">
+      <h2>Bosh sahifa matni va rasmlarini boshqarish</h2>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>Sahifa sarlavhasi:</label>
+        <input type="text" name="title" value="{{ site_title() }}" required>
+        <button type="submit">Saqlash</button>
+      </form>
+    </div>
+
+    <div class="auth-form">
+      <h2>Yangi rasm yuklash</h2>
+      <form method="post" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>Rasm fayli (max 5 MB):</label>
+        <input type="file" name="homepage_image" accept="image/*" required>
+        <button type="submit">Yuklash</button>
+      </form>
+    </div>
+
+    <div class="auth-form">
+      <h2>Hozirgi rasmlar ({{ texnikum_rasmlari|length }} ta)</h2>
+      {% for rasm in texnikum_rasmlari %}
+        <div style="display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid #eee; flex-wrap:wrap">
+          <img src="{{ url_for('static', filename='texnikum/' + rasm) }}" alt="{{ rasm }}" style="width:120px; height:80px; object-fit:cover; border-radius:8px; border:1px solid #ddd">
+          <span style="font-weight:bold; word-break:break-all">{{ rasm }}</span>
+          <form method="post" action="{{ url_for('admin_rasm_ochirish') }}" onsubmit="return confirm('Rasm o\'chirilsinmi?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="filename" value="{{ rasm }}">
+            <button type="submit" class="btn btn-ochirish">O'chirish</button>
+          </form>
+          <form method="post" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="replace_filename" value="{{ rasm }}">
+            <input type="file" name="homepage_image" accept="image/*" required>
+            <button type="submit" class="btn btn-tahrirlash">Almashtirish</button>
+          </form>
+        </div>
+      {% else %}
+        <p style="color:#666; text-align:center">Hozircha rasm yuklanmagan.</p>
+      {% endfor %}
+    </div>
   {% elif sahifa == 'fanlar' %}
     <div class="nav"><a href="{{ url_for('bosh_sahifa') }}">Bosh sahifa</a></div>
     <h2 style="color:white">Sinflar va fanlar ro'yxati</h2>
@@ -1437,10 +1520,7 @@ HTML = """
         <a href="{{ drive_download }}" target="_blank" rel="noopener" class="btn-yuklab-ochish">⬇ Yuklab olish</a>
       </div>
 
-      <p style="background:#fff3cd; color:#856404; padding:10px 14px; border-radius:8px; margin:10px 0; font-size:14px">
-        Ovozli o'qish Google Drive kitoblari uchun brauzer xavfsizligi sababli cheklangan. To'liq ovozli o'qish uchun
-        PDF faylni <b>kutubxonaga yuklab</b> qo'ying — shunda kitob to'liq ovozda o'qib beriladi.
-      </p>
+
 
       <div id="pdf-canvas-wrap" style="position:relative; background:#555; padding:10px; border-radius:8px; margin-bottom:70px">
         <iframe src="{{ drive_preview }}" style="width:100%; height:600px; border:none; border-radius:8px" allow="autoplay; encrypted-media" allowfullscreen></iframe>
@@ -2184,6 +2264,61 @@ def foydalanuvchi_tahrirlash(email):
                                    tahrir_email=email,
                                    tahrir_malumot=f["faollar"][email],
                                    foydalanuvchi=joriy_foydalanuvchi())
+
+
+@app.route("/admin/boshqaruv", methods=["GET", "POST"])
+def admin_boshqaruv():
+    if not admin_mi():
+        flash("Bu sahifa faqat admin uchun", "xato")
+        return redirect(url_for("bosh_sahifa"))
+
+    if request.method == "POST":
+        title = request.form.get("title", "").strip()
+        if title:
+            data = site_settings_yuklash()
+            data["title"] = title
+            site_settings_saqlash(data)
+            flash("Sahifa sarlavhasi saqlandi", "muvaffaqiyat")
+
+        file_item = request.files.get("homepage_image")
+        replace_filename = request.form.get("replace_filename", "").strip()
+        if file_item and file_item.filename:
+            rasm_turi = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+            nomi = secure_filename(file_item.filename)
+            if os.path.splitext(nomi)[1].lower() not in rasm_turi:
+                flash("Faqat rasm fayllari yuklanadi", "xato")
+                return redirect(url_for("admin_boshqaruv"))
+            papka = _get_texnikum_dir()
+            target_name = secure_filename(replace_filename) if replace_filename else nomi
+            target_path = os.path.join(papka, target_name)
+            file_item.save(target_path)
+            flash("Rasm yuklandi", "muvaffaqiyat")
+
+        return redirect(url_for("admin_boshqaruv"))
+
+    return render_template_string(HTML, sahifa="admin_boshqaruv",
+                                   foydalanuvchi=joriy_foydalanuvchi(),
+                                   texnikum_rasmlari=texnikum_rasmlari())
+
+
+@app.route("/admin/rsm/ochirish", methods=["POST"])
+def admin_rasm_ochirish():
+    if not admin_mi():
+        flash("Bu amal faqat admin uchun", "xato")
+        return redirect(url_for("bosh_sahifa"))
+
+    filename = secure_filename(request.form.get("filename", "").strip())
+    if not filename:
+        flash("Rasm nomi topilmadi", "xato")
+        return redirect(url_for("admin_boshqaruv"))
+
+    target = os.path.join(_get_texnikum_dir(), filename)
+    if os.path.exists(target):
+        os.remove(target)
+        flash(f"'{filename}' rasm o'chirildi", "muvaffaqiyat")
+    else:
+        flash("Rasm topilmadi", "xato")
+    return redirect(url_for("admin_boshqaruv"))
 
 
 @app.route("/fanlar")
